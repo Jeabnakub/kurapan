@@ -1,0 +1,2576 @@
+<!doctype html>
+<html lang="th" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบบริหารจัดการครุภัณฑ์</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Kanit', sans-serif;
+    }
+    * {
+      font-family: 'Kanit', sans-serif;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        left: -100%;
+        transition: left 0.3s ease;
+        z-index: 50;
+      }
+      .sidebar.open {
+        left: 0;
+      }
+      .chart-container {
+        height: 250px;
+      }
+    }
+    .theme-preview {
+      height: 60px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      border: 3px solid transparent;
+    }
+    .theme-preview:hover {
+      transform: scale(1.05);
+    }
+    .theme-preview.selected {
+      border-color: #3b82f6;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .image-preview {
+      max-width: 200px;
+      max-height: 200px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .upload-area {
+      border: 2px dashed #cbd5e0;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .upload-area:hover {
+      border-color: #3b82f6;
+      background-color: #f0f9ff;
+    }
+    .upload-area.dragover {
+      border-color: #3b82f6;
+      background-color: #dbeafe;
+    }
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .spinner {
+      border: 4px solid #f3f4f6;
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+
+ </head>
+ <body class="h-full w-full bg-gray-50">
+  <div id="app" class="h-full w-full flex flex-col md:flex-row overflow-hidden"></div>
+  <script>
+    // Configuration
+const defaultConfig = {
+  system_name: 'ระบบบริหารจัดการครุภัณฑ์',
+  organization_name: 'โรงเรียน/หน่วยงาน',
+  logo_url: '',
+  primary_color: '#3b82f6',
+  secondary_color: '#10b981',
+  text_color: '#1f2937',
+  accent_color: '#10b981',
+  sidebar_color: '#1e40af',
+  // เพิ่มบรรทัดนี้
+  inspection_menu_enabled: true
+};
+
+    let config = { ...defaultConfig };
+
+    // Theme presets
+    const themePresets = [
+      { name: 'น้ำเงิน-เขียว', primary: '#3b82f6', secondary: '#10b981' },
+      { name: 'ม่วง-ชมพู', primary: '#8b5cf6', secondary: '#ec4899' },
+      { name: 'ส้ม-แดง', primary: '#f97316', secondary: '#ef4444' },
+      { name: 'เขียว-เหลือง', primary: '#10b981', secondary: '#f59e0b' },
+      { name: 'ฟ้า-ม่วง', primary: '#06b6d4', secondary: '#a855f7' },
+      { name: 'แดง-ส้ม', primary: '#dc2626', secondary: '#f97316' }
+    ];
+
+    // Data storage
+    let currentUser = null;
+    let equipmentData = [];
+    let repairRequests = [];
+    let inspectionRecords = [];
+    let userData = [];
+    
+    let currentImageFile = null;
+
+    // State management
+    let currentPage = 'login';
+    let sidebarOpen = false;
+    let editingEquipment = null;
+    let editingUser = null;
+    let filters = {
+      name: '',
+      code: '',
+      type: '',
+      responsible: '',
+      room: '',
+      status: 'ทุกสถานะ'
+    };
+
+    // Loading overlay
+    function showLoading() {
+      const overlay = document.createElement('div');
+      overlay.id = 'loadingOverlay';
+      overlay.className = 'loading-overlay';
+      overlay.innerHTML = '<div class="spinner"></div>';
+      document.body.appendChild(overlay);
+    }
+
+    function hideLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) overlay.remove();
+    }
+
+    // Google Apps Script API calls
+    function loadConfig() {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result) {
+            config = { ...defaultConfig, ...result };
+          }
+          hideLoading();
+          render();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Load config error:', error);
+          hideLoading();
+          render();
+        })
+        .getConfig();
+    }
+
+    function saveConfig(newConfig) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function() {
+          config = { ...config, ...newConfig };
+          hideLoading();
+          showToast('✅ บันทึกการตั้งค่าเรียบร้อยแล้ว', 'success');
+          setTimeout(() => render(), 500);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Save config error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการบันทึก', 'error');
+        })
+        .saveConfig(newConfig);
+    }
+
+    function loadAllData() {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          userData = result.users || [];
+          equipmentData = result.equipment || [];
+          repairRequests = result.repairs || [];
+          inspectionRecords = result.inspections || [];
+          hideLoading();
+          render();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Load data error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
+        })
+        .getAllData();
+    }
+
+    function saveUser(userData) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) {
+            editingUser = null;
+            loadAllData();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Save user error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการบันทึก', 'error');
+        })
+        .saveUser(userData);
+    }
+
+    function removeUser(username) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) {
+            loadAllData();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Delete user error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการลบ', 'error');
+        })
+        .deleteUser(username);
+    }
+
+    function saveEquipment(equipData) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) {
+            currentImageFile = null;
+            editingEquipment = null;
+            navigateTo('reports');
+            loadAllData();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Save equipment error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการบันทึก', 'error');
+        })
+        .saveEquipment(equipData);
+    }
+
+    function removeEquipment(id) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      showToast(result.message, result.success ? 'success' : 'error');
+      if (result.success) {
+        loadAllData(); // เพิ่มบรรทัดนี้ เพื่อรีเฟรชข้อมูลหลังลบ
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Delete equipment error:', error);
+      hideLoading();
+      showToast('❌ เกิดข้อผิดพลาดในการลบ', 'error');
+    })
+    .deleteEquipment(id);
+}
+
+    function saveRepairRequest(repairData) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) {
+            document.getElementById('repairForm').reset();
+            loadAllData();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Save repair error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการบันทึก', 'error');
+        })
+        .saveRepairRequest(repairData);
+    }
+
+    function updateRepairStatusData(repairId, newStatus) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) {
+            loadAllData();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Update repair status error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการอัพเดท', 'error');
+        })
+        .updateRepairStatus(repairId, newStatus);
+    }
+
+    function saveInspectionRecord(inspectionData) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          showToast(result.message, result.success ? 'success' : 'error');
+          if (result.success) {
+            const modal = document.querySelector('.fixed.inset-0');
+            if (modal) modal.remove();
+            loadAllData();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Save inspection error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการบันทึก', 'error');
+        })
+        .saveInspectionRecord(inspectionData);
+    }
+
+    // File handling function
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Render functions
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (currentPage === 'login') {
+        app.innerHTML = renderLogin();
+        attachLoginListeners();
+      } else {
+        app.innerHTML = `
+          ${renderSidebar()}
+          <div class="flex-1 flex flex-col w-full overflow-hidden">
+            ${renderHeader()}
+            <main class="flex-1 overflow-y-auto p-4 md:p-6 w-full">
+              ${renderCurrentPage()}
+            </main>
+          </div>
+          ${sidebarOpen ? '<div class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" onclick="toggleSidebar()"></div>' : ''}
+        `;
+        attachEventListeners();
+      }
+    }
+
+    function renderLogin() {
+      const bgColor = config.primary_color || defaultConfig.primary_color;
+      const accentColor = config.secondary_color || defaultConfig.secondary_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      
+      return `
+        <div class="w-full h-full flex items-center justify-center p-4" style="background: linear-gradient(135deg, ${bgColor} 0%, ${accentColor} 100%);">
+          <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+              ${config.logo_url ? `
+                <div class="mb-4 flex justify-center">
+                  <img src="${config.logo_url}" alt="Logo" class="h-16 object-contain" onerror="this.style.display='none'">
+                </div>
+              ` : ''}
+              <h1 class="text-3xl font-bold mb-2" style="color: ${textColor};">${config.system_name || defaultConfig.system_name}</h1>
+              <p class="text-gray-600">${config.organization_name || defaultConfig.organization_name}</p>
+            </div>
+            
+            <form id="loginForm" onsubmit="return false;">
+              <div class="mb-4">
+                <label for="username" class="block text-sm font-medium mb-2" style="color: ${textColor};">ชื่อผู้ใช้</label>
+                <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2" style="focus:ring-color: ${bgColor};" required>
+              </div>
+              
+              <div class="mb-6">
+                <label for="password" class="block text-sm font-medium mb-2" style="color: ${textColor};">รหัสผ่าน</label>
+                <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2" style="focus:ring-color: ${bgColor};" required>
+              </div>
+              
+              <button type="submit" class="w-full text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity" style="background-color: ${bgColor};">
+                เข้าสู่ระบบ
+              </button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+function renderSidebar() {
+  const sidebarColor = config.sidebar_color || defaultConfig.sidebar_color;
+  const secondaryColor = '#ffffff';
+
+  return `
+    <aside class="sidebar ${sidebarOpen ? 'open' : ''} w-64 h-full flex flex-col md:relative" style="background-color: ${sidebarColor};">
+      <div class="p-6 border-b" style="border-color: rgba(255,255,255,0.2);">
+        ${config.logo_url ? `
+          <div class="mb-4 flex justify-center">
+            <img src="${config.logo_url}" alt="Logo" class="h-20 object-contain" onerror="this.style.display='none'">
+          </div>
+        ` : ''}
+        <h2 class="text-lg font-bold text-center mb-1" style="color: ${secondaryColor};">${config.system_name || defaultConfig.system_name}</h2>
+        <p class="text-sm text-center opacity-90 mb-3" style="color: ${secondaryColor};">${config.organization_name || defaultConfig.organization_name}</p>
+        <div class="text-center pt-3" style="border-top: 1px solid rgba(255,255,255,0.2);">
+          <p class="text-xs opacity-75" style="color: ${secondaryColor};">ผู้ใช้งาน</p>
+          <p class="text-sm font-medium" style="color: ${secondaryColor};">${currentUser?.name || ''}</p>
+        </div>
+      </div>
+     
+      <nav class="flex-1 p-4 overflow-y-auto">
+        <button onclick="navigateTo('dashboard')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'dashboard' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+          📊 แดชบอร์ด
+        </button>
+        <button onclick="navigateTo('reports')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'reports' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+          📋 รายงาน
+        </button>
+        <button onclick="navigateTo('repair')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'repair' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+          🔧 แจ้งซ่อม
+        </button>
+
+        <!-- เมนูตรวจสอบครุภัณฑ์ - แสดงเฉพาะเมื่อเปิดใช้งาน -->
+        ${config.inspection_menu_enabled ? `
+          <button onclick="navigateTo('inspection')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'inspection' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+            📝 ตรวจสอบครุภัณฑ์ประจำปี
+          </button>
+        ` : ''}
+
+        ${currentUser?.role === 'admin' ? `
+          <button onclick="navigateTo('equipmentList')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'equipmentList' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+            📦 รายการครุภัณฑ์ทั้งหมด
+          </button>
+          <button onclick="navigateTo('repairManagement')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'repairManagement' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+            🔨 จัดการการซ่อม
+          </button>
+          <button onclick="navigateTo('add')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'add' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+            ➕ เพิ่มข้อมูล
+          </button>
+          <div class="my-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.2);">
+            <button onclick="navigateTo('users')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'users' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+              👥 จัดการผู้ใช้
+            </button>
+            <button onclick="navigateTo('settings')" class="w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${currentPage === 'settings' ? 'bg-white bg-opacity-20' : 'hover:bg-white hover:bg-opacity-10'}" style="color: ${secondaryColor};">
+              ⚙️ ตั้งค่าระบบ
+            </button>
+          </div>
+        ` : ''}
+      </nav>
+     
+      <div class="p-4" style="border-top: 1px solid rgba(255,255,255,0.2);">
+        <button onclick="logout()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-10 transition-colors" style="color: ${secondaryColor};">
+          🚪 ออกจากระบบ
+        </button>
+      </div>
+    </aside>
+  `;
+}
+
+    function renderHeader() {
+      const bgColor = '#ffffff';
+      const textColor = config.text_color || defaultConfig.text_color;
+      
+      return `
+        <header class="border-b p-4 md:p-6 flex items-center justify-between w-full" style="background-color: ${bgColor};">
+          <div class="flex items-center gap-4">
+            <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg hover:bg-gray-100">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            <h1 class="text-xl md:text-2xl font-bold" style="color: ${textColor};">${getPageTitle()}</h1>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm" style="color: ${textColor};">${currentUser?.name || ''}</span>
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+              ${currentUser?.role === 'admin' ? 'A' : 'U'}
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderCurrentPage() {
+      switch(currentPage) {
+        case 'dashboard': return renderDashboard();
+        case 'reports': return renderReports();
+        case 'repair': return renderRepair();
+        case 'inspection': return renderInspection();
+        case 'equipmentList': return renderEquipmentList();
+        case 'repairManagement': return renderRepairManagement();
+        case 'add': return renderAddForm();
+        case 'users': return renderUsers();
+        case 'settings': return renderSettings();
+        default: return renderDashboard();
+      }
+    }
+
+    function renderDashboard() {
+      let userEquipment = equipmentData;
+      if (currentUser?.role === 'user') {
+        userEquipment = equipmentData.filter(item => 
+          item.owner === currentUser.username || item.responsible === currentUser.name
+        );
+      }
+      
+      const stats = calculateStats(userEquipment);
+      const recentItems = userEquipment.slice(-5).reverse();
+      
+      const totalValue = userEquipment.reduce((sum, item) => {
+      const price = parseFloat(item.price) || 0;
+      const quantity = parseInt(item.quantity) || 1;
+      return sum + (price * quantity);
+      }, 0);
+      const totalUsers = userData.length;
+      const totalRepairs = repairRequests.length;
+      const pendingRepairs = repairRequests.filter(r => r.status === 'รอดำเนินการ').length;
+      const totalInspections = inspectionRecords.length;
+      const thisYearInspections = inspectionRecords.filter(r => r.year === String(new Date().getFullYear() + 543)).length;
+      
+      return `
+        <div class="space-y-6 w-full">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+            ${renderStatCard('ทั้งหมด', stats.total, '📦', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)')}
+            ${renderStatCard('ใช้งานได้', stats.available, '✅', 'linear-gradient(135deg, #10b981 0%, #059669 100%)')}
+            ${renderStatCard('รอซ่อม', stats.repair, '🔧', 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)')}
+            ${renderStatCard('ชำรุด', stats.broken, '❌', 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)')}
+            ${renderStatCard('จำหน่าย', stats.disposed, '📤', 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)')}
+          </div>
+          
+          <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">📊 สถิติการใช้งานระบบ</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <p class="text-xs text-gray-600 mb-1">👥 ผู้ใช้ทั้งหมด</p>
+                <p class="text-2xl font-bold text-blue-600">${totalUsers}</p>
+                <p class="text-xs text-gray-500 mt-1">คน</p>
+              </div>
+              
+              <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <p class="text-xs text-gray-600 mb-1">📦 ครุภัณฑ์ทั้งหมด</p>
+                <p class="text-2xl font-bold text-green-600">${userEquipment.length}</p>
+                <p class="text-xs text-gray-500 mt-1">รายการ</p>
+              </div>
+              <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+  <p class="text-xs text-gray-600 mb-1">💰 มูลค่ารวม</p>
+  <p class="text-2xl font-bold text-purple-600">
+    ${totalValue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+  </p>
+  <p class="text-xs text-gray-500 mt-1">บาท</p>
+</div>
+              
+              
+              <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <p class="text-xs text-gray-600 mb-1">🔧 แจ้งซ่อมทั้งหมด</p>
+                <p class="text-2xl font-bold text-yellow-600">${totalRepairs}</p>
+                <p class="text-xs text-gray-500 mt-1">รายการ</p>
+              </div>
+              
+              <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <p class="text-xs text-gray-600 mb-1">⏳ รอดำเนินการ</p>
+                <p class="text-2xl font-bold text-orange-600">${pendingRepairs}</p>
+                <p class="text-xs text-gray-500 mt-1">รายการ</p>
+              </div>
+              
+              <div class="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <p class="text-xs text-gray-600 mb-1">📋 ตรวจสอบปีนี้</p>
+                <p class="text-2xl font-bold text-teal-600">${thisYearInspections}</p>
+                <p class="text-xs text-gray-500 mt-1">จาก ${totalInspections}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+              <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">สถานะครุภัณฑ์</h3>
+              <div class="overflow-x-auto">
+                ${renderBarChart(stats)}
+              </div>
+            </div>
+          <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">รายการครุภัณฑ์ล่าสุด</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b bg-gray-50">
+                    <th class="text-left p-3">รหัส</th>
+                    <th class="text-left p-3">ชื่อรายการ</th>
+                    <th class="text-left p-3 hidden md:table-cell">สถานที่</th>
+                    <th class="text-left p-3">สถานะ</th>
+                    <th class="text-left p-3 hidden md:table-cell">ราคา</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recentItems.map(item => `
+                    <tr class="border-b hover:bg-gray-100 transition-colors">
+                      <td class="p-3">${item.id}</td>
+                      <td class="p-3">${item.name}</td>
+                      <td class="p-3 hidden md:table-cell">${item.location}</td>
+                      <td class="p-3">${renderStatusBadge(item.status)}</td>
+                      <td class="p-3 hidden md:table-cell">${item.price.toLocaleString()} บาท</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>             
+            </div>
+          </div>
+          
+          
+          </div>
+        </div>
+      `;
+    }
+
+function renderReports() {
+  let filteredData = equipmentData;
+
+  if (currentUser?.role === 'user') {
+    filteredData = filteredData.filter(item => 
+      item.owner === currentUser.username || item.responsible === currentUser.name
+    );
+  }
+
+  // ดึงรายการกลุ่มสาระ/งาน ที่ไม่ซ้ำกัน
+  const departments = [...new Set(equipmentData.map(item => item.department).filter(Boolean))].sort();
+
+  if (filters.name) filteredData = filteredData.filter(item => item.name.includes(filters.name));
+  if (filters.code) filteredData = filteredData.filter(item => item.id.includes(filters.code));
+  if (filters.type && filters.type !== 'ทุกกลุ่มสาระ') filteredData = filteredData.filter(item => item.department === filters.type);
+  if (filters.responsible) filteredData = filteredData.filter(item => item.responsible.includes(filters.responsible));
+  if (filters.room) filteredData = filteredData.filter(item => item.location.includes(filters.room));
+  if (filters.status !== 'ทุกสถานะ') filteredData = filteredData.filter(item => item.status === filters.status);
+
+  return `
+    <div class="space-y-6 w-full">
+      <div class="bg-white rounded-lg shadow p-4 md:p-6">
+        <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">ตัวกรองข้อมูล</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <input type="text" id="filterName" placeholder="ชื่อ" class="px-4 py-2 border rounded-lg" value="${filters.name}">
+          <input type="text" id="filterCode" placeholder="รหัส" class="px-4 py-2 border rounded-lg" value="${filters.code}">
+          
+          <!-- เปลี่ยนจาก input text เป็น select -->
+          <select id="filterType" class="px-4 py-2 border rounded-lg">
+            <option value="ทุกกลุ่มสาระ"${filters.type === 'ทุกกลุ่มสาระ' || !filters.type ? ' selected' : ''}>ทุกกลุ่มสาระ/งาน</option>
+            ${departments.map(dept => `
+              <option value="${dept}"${filters.type === dept ? ' selected' : ''}>${dept}</option>
+            `).join('')}
+          </select>
+          
+          <input type="text" id="filterResponsible" placeholder="ผู้รับผิดชอบ" class="px-4 py-2 border rounded-lg" value="${filters.responsible}">
+          <input type="text" id="filterRoom" placeholder="ห้อง" class="px-4 py-2 border rounded-lg" value="${filters.room}">
+          <select id="filterStatus" class="px-4 py-2 border rounded-lg">
+            <option ${filters.status === 'ทุกสถานะ' ? 'selected' : ''}>ทุกสถานะ</option>
+            <option ${filters.status === 'ใช้งานได้' ? 'selected' : ''}>ใช้งานได้</option>
+            <option ${filters.status === 'ใช้งานได้' ? 'selected' : ''}>ใช้งานไม่ได้</option>
+            <option ${filters.status === 'รอซ่อม' ? 'selected' : ''}>รอซ่อม</option>
+            <option ${filters.status === 'ชำรุด' ? 'selected' : ''}>ชำรุด</option>
+            <option ${filters.status === 'รอจำหน่าย' ? 'selected' : ''}>รอจำหน่าย</option>
+            <option ${filters.status === 'จำหน่าย' ? 'selected' : ''}>จำหน่าย</option>
+          </select>
+        </div>
+        <div class="flex gap-2 mt-4 flex-wrap">
+          <button onclick="applyFilters()" class="px-6 py-2 rounded-lg text-white" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+            ค้นหา
+          </button>
+          <button onclick="clearFilters()" class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+            ล้างตัวกรอง
+          </button>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow p-4 md:p-6">
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+          <h3 class="text-lg font-semibold" style="color: ${config.text_color || defaultConfig.text_color};">รายการครุภัณฑ์ (${filteredData.length})</h3>
+          <button onclick="printReport()" class="px-4 py-2 rounded-lg text-white flex items-center gap-2 text-sm" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+            🖨️ พิมพ์รายงาน
+          </button>
+<div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b bg-gray-50">
+        <th class="text-center p-3 whitespace-nowrap">รหัส</th>
+        <th class="text-center p-3 whitespace-nowrap">รูปภาพ</th>
+        <th class="text-center p-3 whitespace-nowrap">ชื่อรายการ</th>
+        <th class="text-center p-3 whitespace-nowrap">วันที่ได้มา</th>
+        <th class="text-center p-3 whitespace-nowrap">จำนวน</th>
+        <th class="text-center p-3 whitespace-nowrap">หน่วย</th>
+        <th class="text-center p-3 whitespace-nowrap">ราคา (บาท)</th>
+        <th class="text-center p-3 whitespace-nowrap">งบประมาณ</th>
+        <th class="text-center p-3 whitespace-nowrap">สถานที่</th>
+        <!-- เพิ่มคอลัมน์กลุ่มสาระ/งาน หลังสถานที่ -->
+        <th class="text-center p-3 whitespace-nowrap">กลุ่มสาระ/งาน</th>
+        <th class="text-center p-3 whitespace-nowrap">ผู้รับผิดชอบ</th>
+        <th class="text-center p-3 whitespace-nowrap">สถานะ</th>
+        <th class="text-center p-3 whitespace-nowrap">จัดการ</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filteredData.map(item => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-3 whitespace-nowrap">${item.id}</td>
+          <td class="p-3">
+            ${item.image ? `
+              <img src="${item.image}" alt="${item.name}" class="w-12 h-12 object-cover rounded cursor-pointer" onclick="viewImage('${item.image}')">
+            ` : '<span class="text-gray-400">-</span>'}
+          </td>
+          <td class="p-3">${item.name}</td>
+          <td class="p-3 whitespace-nowrap">${item.date}</td>
+          <td class="p-3 text-center">${item.quantity}</td>
+          <td class="p-3 text-center">${item.unit}</td>
+          <td class="p-3 text-right whitespace-nowrap">${item.price.toLocaleString()}</td>
+          <td class="p-3">${item.budget}</td>
+          <td class="p-3">${item.location}</td>
+          <!-- ข้อมูลกลุ่มสาระ/งาน -->
+          <td class="p-3">${item.department || '-'}</td>
+          <td class="p-3">${item.responsible}</td>
+          <td class="p-3 whitespace-nowrap">${renderStatusBadge(item.status)}</td>
+          <td class="p-3">
+            <div class="flex gap-2 justify-center">
+              ${canEdit(item) ? `
+                <button onclick="editEquipment('${item.id}')" class="text-blue-600 hover:text-blue-800" title="แก้ไข">✏️</button>
+                <button onclick="deleteEquipment('${item.id}')" class="text-red-600 hover:text-red-800" title="ลบ">🗑️</button>
+              ` : '<span class="text-gray-400">-</span>'}
+            </div>
+          </td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+</div>
+      </div>
+    </div>
+  `;
+}
+
+    function renderRepair() {
+      let userEquipment = equipmentData;
+      let userRequests = repairRequests;
+      
+      if (currentUser?.role === 'user') {
+        userEquipment = equipmentData.filter(item => 
+          item.owner === currentUser.username || item.responsible === currentUser.name
+        );
+        userRequests = repairRequests.filter(req => req.owner === currentUser.username);
+      }
+      
+      return `
+        <div class="space-y-6 w-full">
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">แจ้งซ่อมครุภัณฑ์</h3>
+            <form id="repairForm" class="space-y-4" onsubmit="return false;">
+              <div>
+                <label for="repairEquipment" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">เลือกครุภัณฑ์</label>
+                <select id="repairEquipment" class="w-full px-4 py-2 border rounded-lg" required>
+                  <option value="">-- เลือกครุภัณฑ์ --</option>
+                  ${userEquipment.map(item => `<option value="${item.id}">${item.id} - ${item.name}</option>`).join('')}
+                </select>
+              </div>
+              
+              <div>
+                <label for="repairDate" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">วันที่แจ้งซ่อม</label>
+                <input type="date" id="repairDate" class="w-full px-4 py-2 border rounded-lg" required>
+              </div>
+              
+              <div>
+                <label for="repairDescription" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">รายละเอียดปัญหา</label>
+                <textarea id="repairDescription" class="w-full px-4 py-2 border rounded-lg" rows="3" required></textarea>
+              </div>
+              
+              <button type="submit" class="w-full md:w-auto px-6 py-2 rounded-lg text-white" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+                บันทึกการแจ้งซ่อม
+              </button>
+            </form>
+          </div>
+          
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">รายการแจ้งซ่อมของฉัน</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b">
+                    <th class="text-left p-3">รหัสซ่อม</th>
+                    <th class="text-left p-3">ครุภัณฑ์</th>
+                    <th class="text-left p-3 hidden md:table-cell">วันที่แจ้ง</th>
+                    <th class="text-left p-3">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${userRequests.map(req => `
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="p-3">${req.id}</td>
+                      <td class="p-3">${req.equipmentName}</td>
+                      <td class="p-3 hidden md:table-cell">${req.date}</td>
+                      <td class="p-3">${renderStatusBadge(req.status)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderInspection() {
+      let userEquipment = equipmentData;
+      let userInspections = inspectionRecords;
+      
+      if (currentUser?.role === 'user') {
+        userEquipment = equipmentData.filter(item => 
+          item.owner === currentUser.username || item.responsible === currentUser.name
+        );
+        userInspections = inspectionRecords.filter(rec => rec.owner === currentUser.username);
+      }
+      
+      return `
+        <div class="space-y-6 w-full">
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">รายการครุภัณฑ์ที่รับผิดชอบ</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b">
+                    <th class="text-left p-3">รหัส</th>
+                    <th class="text-left p-3">รูป</th>
+                    <th class="text-left p-3">ชื่อครุภัณฑ์</th>
+                    <th class="text-left p-3 hidden md:table-cell">สถานที่</th>
+                    <th class="text-left p-3 hidden lg:table-cell">ผู้รับผิดชอบ</th>
+                    <th class="text-left p-3">สถานะ</th>
+                    <th class="text-left p-3">ดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${userEquipment.map(item => `
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="p-3">${item.id}</td>
+                      <td class="p-3">
+                        ${item.image ? `
+                          <img src="${item.image}" alt="${item.name}" class="w-10 h-10 object-cover rounded cursor-pointer" onclick="viewImage('${item.image}')">
+                        ` : '<span class="text-gray-400 text-xs">-</span>'}
+                      </td>
+                      <td class="p-3">${item.name}</td>
+                      <td class="p-3 hidden md:table-cell">${item.location}</td>
+                      <td class="p-3 hidden lg:table-cell">${item.responsible}</td>
+                      <td class="p-3">${renderStatusBadge(item.status)}</td>
+                      <td class="p-3">
+                        <button onclick="openInspectionModal('${item.id}')" class="px-3 py-1 text-sm rounded text-white hover:opacity-90" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+                
+                          ตรวจสอบ
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+              <h3 class="text-lg font-semibold" style="color: ${config.text_color || defaultConfig.text_color};">ประวัติการตรวจสอบ (${userInspections.length} รายการ)</h3>
+              <button onclick="printInspectionReport()" class="px-4 py-2 rounded-lg text-white flex items-center gap-2 text-sm" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+                🖨️ พิมพ์รายงาน
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b">
+                    <th class="text-left p-3">รหัส</th>
+                    <th class="text-left p-3">ครุภัณฑ์</th>
+                    <th class="text-left p-3 hidden md:table-cell">วันที่ตรวจ</th>
+                    <th class="text-left p-3 hidden lg:table-cell">ปีงบประมาณ</th>
+                    <th class="text-left p-3">สภาพ</th>
+                    <th class="text-left p-3 hidden lg:table-cell">ผู้ตรวจสอบ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${userInspections.map(rec => `
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="p-3">${rec.id}</td>
+                      <td class="p-3">${rec.equipmentName}</td>
+                      <td class="p-3 hidden md:table-cell">${rec.inspectionDate}</td>
+                      <td class="p-3 hidden lg:table-cell">${rec.year}</td>
+                      <td class="p-3">${renderStatusBadge(rec.condition)}</td>
+                      <td class="p-3 hidden lg:table-cell">${rec.inspector}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRepairManagement() {
+      return `
+        <div class="space-y-6 w-full">
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">จัดการรายการซ่อมทั้งหมด</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b">
+                    <th class="text-left p-3">รหัสซ่อม</th>
+                    <th class="text-left p-3">ครุภัณฑ์</th>
+                    <th class="text-left p-3 hidden md:table-cell">ผู้แจ้ง</th>
+                    <th class="text-left p-3 hidden lg:table-cell">วันที่แจ้ง</th>
+                    <th class="text-left p-3">สถานะ</th>
+                    <th class="text-left p-3">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${repairRequests.map(req => {
+                    const user = userData.find(u => u.username === req.owner);
+                    return `
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="p-3">${req.id}</td>
+                      <td class="p-3">${req.equipmentName}</td>
+                      <td class="p-3 hidden md:table-cell">${user?.name || '-'}</td>
+                      <td class="p-3 hidden lg:table-cell">${req.date}</td>
+                      <td class="p-3">
+                        <select onchange="updateRepairStatus('${req.id}', this.value)" class="px-2 py-1 border rounded text-sm">
+                          <option value="รอดำเนินการ" ${req.status === 'รอดำเนินการ' ? 'selected' : ''}>รอดำเนินการ</option>
+                          <option value="กำลังซ่อม" ${req.status === 'กำลังซ่อม' ? 'selected' : ''}>กำลังซ่อม</option>
+                          <option value="ซ่อมเสร็จแล้ว" ${req.status === 'ซ่อมเสร็จแล้ว' ? 'selected' : ''}>ซ่อมเสร็จแล้ว</option>
+                          <option value="ไม่สามารถซ่อมได้" ${req.status === 'ไม่สามารถซ่อมได้' ? 'selected' : ''}>ไม่สามารถซ่อมได้</option>
+                        </select>
+                      </td>
+                      <td class="p-3">
+                        <button onclick="viewRepairDetail('${req.id}')" class="text-blue-600 hover:text-blue-800">👁️</button>
+                      </td>
+                    </tr>
+                  `}).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+function renderEquipmentList() {
+  const primaryColor = config.primary_color || defaultConfig.primary_color;
+  const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+  const textColor = config.text_color || defaultConfig.text_color;
+  
+  return `
+    <div class="w-full max-w-7xl mx-auto">
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-6" style="color: ${textColor};">รายการครุภัณฑ์ทั้งหมด (${equipmentData.length} รายการ)</h2>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b-2" style="border-color: ${primaryColor};">
+                <th class="text-left p-3">รหัส</th>
+                <th class="text-left p-3">ชื่อครุภัณฑ์</th>
+                <th class="text-left p-3">ประเภท</th>
+                <th class="text-center p-3">จำนวน</th>
+                <th class="text-right p-3">ราคา/หน่วย</th>
+                <th class="text-left p-3">ผู้รับผิดชอบ</th>
+                <th class="text-center p-3">สถานะ</th>
+                <th class="text-center p-3">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${equipmentData.map(item => `
+                <tr class="border-b hover:bg-gray-50">
+                  <td class="p-3">${item.id || item.code || '-'}</td>
+                  <td class="p-3"><div class="font-medium">${item.name}</div></td>
+                  <td class="p-3">${item.department || '-'}</td>
+                  <td class="p-3 text-center">${item.quantity}</td>
+                  <td class="p-3 text-right">${Number(item.price || 0).toLocaleString()}</td>
+                  <td class="p-3">${item.responsible}</td>
+                  <td class="p-3 text-center">
+                    <span class="status-badge" style="background-color: ${item.status === 'ใช้งานได้' ? '#dcfce7' : '#fee2e2'}; color: ${item.status === 'ใช้งานได้' ? '#166534' : '#991b1b'}; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;">
+                      ${item.status}
+                    </span>
+                  </td>
+                  <td class="p-3 text-center">
+                    <button onclick="editEquipment('${item.id}')" class="px-3 py-1 rounded text-white text-sm mr-2" style="background-color: ${secondaryColor};">✏️ แก้ไข</button>
+                    <button onclick="deleteEquipment('${item.id}')" class="px-3 py-1 rounded bg-red-500 text-white text-sm hover:bg-red-600">🗑️ ลบ</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
+
+function confirmDeleteEquipment(id) {
+  const equipment = equipmentData.find(e => e.id === id);
+  if (!equipment) return;
+  
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md">
+      <h3 class="text-xl font-bold mb-4 text-red-600">⚠️ ยืนยันการลบ</h3>
+      <p class="mb-4">คุณต้องการลบครุภัณฑ์นี้หรือไม่?</p>
+      <p class="mb-4 font-medium">${equipment.name} (${equipment.code})</p>
+      <div class="flex gap-2 justify-end">
+        <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">ยกเลิก</button>
+        <button onclick="deleteEquipmentConfirmed('${id}')" class="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600">ยืนยันการลบ</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function deleteEquipmentConfirmed(id) {
+  const modal = document.querySelector('.fixed.inset-0');
+  if (modal) modal.remove();
+  removeEquipment(id);
+}
+    function renderUsers() {
+      const user = editingUser ? userData.find(u => u.username === editingUser) : null;
+      
+      return `
+        <div class="space-y-6 w-full">
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">
+              ${editingUser ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}
+            </h3>
+            <form id="userForm" class="space-y-4" onsubmit="return false;">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="userName" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ชื่อ-นามสกุล</label>
+                  <input type="text" id="userName" class="w-full px-4 py-2 border rounded-lg" value="${user?.name || ''}" required>
+                </div>
+                <div>
+                  <label for="userUsername" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ชื่อผู้ใช้</label>
+                  <input type="text" id="userUsername" class="w-full px-4 py-2 border rounded-lg" value="${editingUser || ''}" ${editingUser ? 'readonly' : ''} required>
+                </div>
+                <div>
+                  <label for="userPassword" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">รหัสผ่าน ${editingUser ? '(เว้นว่างหากไม่ต้องการเปลี่ยน)' : ''}</label>
+                  <input type="password" id="userPassword" class="w-full px-4 py-2 border rounded-lg" ${editingUser ? '' : 'required'}>
+                </div>
+                <div>
+                  <label for="userRole" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">บทบาท</label>
+                  <select id="userRole" class="w-full px-4 py-2 border rounded-lg" required>
+                    <option value="user" ${user?.role === 'user' ? 'selected' : ''}>ผู้ใช้ทั่วไป</option>
+                    <option value="admin" ${user?.role === 'admin' ? 'selected' : ''}>ผู้ดูแลระบบ</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex gap-3">
+                <button type="submit" class="px-6 py-2 rounded-lg text-white" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+                  ${editingUser ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ใช้'}
+                </button>
+                ${editingUser ? `
+                  <button type="button" onclick="cancelEditUser()" class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+                    ยกเลิก
+                  </button>
+                ` : ''}
+              </div>
+            </form>
+          </div>
+          
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">รายการผู้ใช้ทั้งหมด</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b">
+                    <th class="text-left p-3">ชื่อ-นามสกุล</th>
+                    <th class="text-left p-3">ชื่อผู้ใช้</th>
+                    <th class="text-left p-3 hidden md:table-cell">บทบาท</th>
+                    <th class="text-left p-3">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${userData.map(user => `
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="p-3">${user.name}</td>
+                      <td class="p-3">${user.username}</td>
+                      <td class="p-3 hidden md:table-cell">
+                        <span class="status-badge ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">
+                          ${user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้ทั่วไป'}
+                        </span>
+                      </td>
+                      <td class="p-3">
+                        <div class="flex gap-2 justify-center">
+                          ${user.username !== 'admin' ? `
+                            <button onclick="editUser('${user.username}')" class="text-blue-600 hover:text-blue-800" title="แก้ไข">✏️</button>
+                            <button onclick="deleteUser('${user.username}')" class="text-red-600 hover:text-red-800" title="ลบ">🗑️</button>
+                          ` : '<span class="text-gray-400">-</span>'}
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSettings() {
+      const currentPrimary = config.primary_color || defaultConfig.primary_color;
+      const currentSecondary = config.secondary_color || defaultConfig.secondary_color;
+      
+      return `
+        <div class="space-y-6 w-full max-w-4xl">
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
+            <h3 class="text-lg font-semibold mb-6" style="color: ${config.text_color || defaultConfig.text_color};">ตั้งค่าระบบ</h3>
+            
+            <div class="space-y-6">
+              <div class="border-b pb-4">
+                <h4 class="font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color};">ข้อมูลระบบ</h4>
+                <div class="space-y-3">
+                  <div>
+                    <label for="settingSystemName" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ชื่อระบบ</label>
+                    <input type="text" id="settingSystemName" class="w-full px-4 py-2 border rounded-lg" value="${config.system_name || defaultConfig.system_name}">
+                  </div>
+                  <div>
+                    <label for="settingOrgName" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ชื่อหน่วยงาน</label>
+                    <input type="text" id="settingOrgName" class="w-full px-4 py-2 border rounded-lg" value="${config.organization_name || defaultConfig.organization_name}">
+                  </div>
+                  <div>
+                    <label for="settingLogoUrl" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">URL โลโก้ (ลิงก์รูปภาพ)</label>
+                    <input type="url" id="settingLogoUrl" class="w-full px-4 py-2 border rounded-lg" placeholder="https://example.com/logo.png" value="${config.logo_url || ''}">
+                    <p class="text-xs text-gray-500 mt-1">ใส่ URL รูปโลโก้ เช่น https://example.com/logo.png</p>
+                    ${config.logo_url ? `
+                      <div class="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs text-gray-600 mb-2">ตัวอย่างโลโก้:</p>
+                        <img src="${config.logo_url}" alt="Logo Preview" class="h-16 object-contain" onerror="this.parentElement.innerHTML='<p class=\'text-xs text-red-500\'>ไม่สามารถโหลดรูปภาพได้</p>'">
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+              ${currentUser?.role === 'admin' ? `
+<div class="border-b pb-4">
+  <h4 class="font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color};">ควบคุมการแสดงเมนู (สำหรับผู้ดูแล)</h4>
+  <div class="flex items-center justify-between py-2">
+    <div>
+      <span class="font-medium">แสดงเมนู "ตรวจสอบครุภัณฑ์ประจำปี"</span>
+      <p class="text-xs text-gray-500">ปิดเมนูนี้เมื่อไม่อยากให้บุคลากรเห็นในช่วงที่ยังไม่ถึงกำหนดตรวจ</p>
+    </div>
+    <label class="relative inline-flex items-center cursor-pointer">
+      <input type="checkbox" id="inspectionMenuToggle" class="sr-only peer" 
+             ${config.inspection_menu_enabled ? 'checked' : ''}>
+      <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 
+                  peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] 
+                  after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 
+                  after:border after:rounded-full after:h-5 after:w-5 after:transition-all 
+                  peer-checked:bg-blue-600"></div>
+    </label>
+  </div>
+</div>
+` : ''}
+
+              <div class="border-b pb-4">
+                <h4 class="font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color};">ธีมสี (เลือก 2 สีผสมกัน)</h4>
+                
+                <div class="mb-4">
+                  <p class="text-sm mb-3" style="color: ${config.text_color || defaultConfig.text_color};">ชุดสีสำเร็จรูป:</p>
+                  <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    ${themePresets.map((theme, index) => `
+                      <div onclick="selectTheme('${theme.primary}', '${theme.secondary}')" 
+                           class="theme-preview cursor-pointer ${currentPrimary === theme.primary && currentSecondary === theme.secondary ? 'selected' : ''}"
+                           style="background: linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%);">
+                        <div class="h-full flex items-center justify-center">
+                          <span class="text-white text-sm font-medium text-center px-2">${theme.name}</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+                
+                <div class="mt-4">
+                  <p class="text-sm mb-3" style="color: ${config.text_color || defaultConfig.text_color};">หรือกำหนดสีเอง:</p>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">สีหลัก (Primary)</label>
+                      <div class="flex gap-2">
+                        <input type="color" id="settingPrimaryColor" class="h-10 w-20 border rounded cursor-pointer" value="${currentPrimary}">
+                        <input type="text" id="settingPrimaryColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" value="${currentPrimary}">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">สีรอง (Secondary)</label>
+                      <div class="flex gap-2">
+                        <input type="color" id="settingSecondaryColor" class="h-10 w-20 border rounded cursor-pointer" value="${currentSecondary}">
+                        <input type="text" id="settingSecondaryColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" value="${currentSecondary}">
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="mt-4 p-4 rounded-lg" style="background: linear-gradient(135deg, ${currentPrimary} 0%, ${currentSecondary} 100%);">
+                    <p class="text-white text-center font-medium">ตัวอย่างการผสมสี</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="border-b pb-4">
+                <h4 class="font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color};">สถิติการใช้งาน</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">จำนวนผู้ใช้</p>
+                    <p class="text-2xl font-bold text-blue-600">${userData.length}</p>
+                  </div>
+                  <div class="bg-green-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">ครุภัณฑ์ทั้งหมด</p>
+                    <p class="text-2xl font-bold text-green-600">${equipmentData.length}</p>
+                  </div>
+                  <div class="bg-yellow-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">รอซ่อม</p>
+                    <p class="text-2xl font-bold text-yellow-600">${repairRequests.filter(r => r.status === 'รอดำเนินการ').length}</p>
+                  </div>
+                  <div class="bg-purple-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">มูลค่ารวม</p>
+                    <p class="text-lg md:text-2xl font-bold text-purple-600">${equipmentData.reduce((sum, item) => {
+  const price = parseFloat(item.price) || 0;
+  const quantity = parseInt(item.quantity) || 1;
+  return sum + (price * quantity);
+}, 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 class="font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color};">การจัดการข้อมูล</h4>
+                <div class="flex gap-3 flex-wrap">
+                  <button onclick="saveSettings()" class="px-6 py-2 rounded-lg text-white" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+                    💾 บันทึกการตั้งค่า
+                  </button>
+                  <button onclick="exportData()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    📥 ส่งออกข้อมูล
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+function renderAddForm() {
+  const isEdit = editingEquipment !== null;
+  const item = isEdit ? equipmentData.find(eq => eq.id === editingEquipment) : null;  // แก้ตรงนี้
+
+  console.log('🔍 Debug renderAddForm:');
+  console.log('- isEdit:', isEdit);
+  console.log('- editingEquipment:', editingEquipment);
+  console.log('- item found:', item);
+
+ let displayDate = '';
+if (item && item.date) {
+  // แปลงวันที่ให้เป็น YYYY-MM-DD
+  const parts = item.date.split('/');
+  if (parts.length === 3) {
+    let day = parts[0].padStart(2, '0');
+    let month = parts[1].padStart(2, '0');
+    let year = parts[2];
+
+    // ถ้าเป็น พ.ศ. ให้แปลงเป็น ค.ศ.
+    if (year.length === 4 && parseInt(year) > 2400) {
+      year = (parseInt(year) - 543).toString();
+    }
+
+    displayDate = `${year}-${month}-${day}`;
+  } else {
+    // ถ้าเป็น format อื่น ลองใช้ Date object
+    const dateObj = new Date(item.date);
+    if (!isNaN(dateObj.getTime())) {
+      displayDate = dateObj.toISOString().split('T')[0];
+    }
+  }
+}
+
+const formData = item ? {
+  id: item.id || '',
+  name: item.name || '',
+  date: displayDate,  // ใช้ค่าที่แปลงแล้ว
+  quantity: item.quantity || '',
+  unit: item.unit || '',
+  price: item.price || '',
+  budget: item.budget || '',
+  location: item.location || '',
+  department: item.department || '',
+  responsible: item.responsible || '',
+  status: item.status || 'ใช้งานได้',
+  image: item.image || ''
+} : {
+  id: '',
+  name: '',
+  date: '',
+  quantity: '',
+  unit: '',
+  price: '',
+  budget: '',
+  location: '',
+  department: '',
+  responsible: '',
+  status: 'ใช้งานได้',
+  image: ''
+};
+  
+  return `
+    <div class="bg-white rounded-lg shadow p-4 md:p-6 max-w-4xl mx-auto w-full">
+      <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">
+        ${isEdit ? '✏️ แก้ไขข้อมูลครุภัณฑ์' : '➕ เพิ่มข้อมูลครุภัณฑ์ใหม่'}
+      </h3>
+      <form id="equipmentForm" class="space-y-4" onsubmit="return false;">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="equipId" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">รหัสครุภัณฑ์</label>
+            <input type="text" id="equipId" class="w-full px-4 py-2 border rounded-lg" value="${formData.id}" ${isEdit ? 'readonly' : ''} required>
+          </div>
+          
+          <div>
+            <label for="equipName" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ชื่อรายการ</label>
+            <input type="text" id="equipName" class="w-full px-4 py-2 border rounded-lg" value="${formData.name}" required>
+          </div>
+          
+          <div>
+            <label for="equipDate" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">วันที่ได้มา</label>
+            <input type="date" id="equipDate" class="w-full px-4 py-2 border rounded-lg" value="${formData.date}" required>
+          </div>
+          
+          <div>
+            <label for="equipQuantity" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">จำนวน</label>
+            <input type="number" id="equipQuantity" class="w-full px-4 py-2 border rounded-lg" value="${formData.quantity}" required>
+          </div>
+          
+          <div>
+            <label for="equipUnit" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">หน่วยนับ</label>
+            <input type="text" id="equipUnit" class="w-full px-4 py-2 border rounded-lg" value="${formData.unit}" required>
+          </div>
+          
+          <div>
+            <label for="equipPrice" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ราคา (บาท)</label>
+            <input type="number" id="equipPrice" class="w-full px-4 py-2 border rounded-lg" value="${formData.price}" required>
+          </div>
+          
+          <div>
+            <label for="equipBudget" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">แหล่งงบประมาณ</label>
+            <input type="text" id="equipBudget" class="w-full px-4 py-2 border rounded-lg" value="${formData.budget}" required>
+          </div>
+          
+          <div>
+            <label for="equipLocation" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ใช้ประจำที่</label>
+            <input type="text" id="equipLocation" class="w-full px-4 py-2 border rounded-lg" value="${formData.location}" required>
+          </div>
+          
+          <div>
+            <label for="equipDepartment" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">กลุ่มสาระ/กลุ่ม/งาน</label>
+            <input type="text" id="equipDepartment" class="w-full px-4 py-2 border rounded-lg" value="${formData.department}" required>
+          </div>
+          
+          <div>
+            <label for="equipResponsible" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">ผู้รับผิดชอบ</label>
+            <select id="equipResponsible" class="w-full px-4 py-2 border rounded-lg" required>
+              <option value="">-- เลือกผู้รับผิดชอบ --</option>
+              ${userData.map(user => `
+                <option value="${user.name}" ${formData.responsible === user.name ? 'selected' : ''}>${user.name}</option>
+              `).join('')}
+            </select>
+          </div>
+          
+          <div>
+            <label for="equipStatus" class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">สถานะ</label>
+            <select id="equipStatus" class="w-full px-4 py-2 border rounded-lg" required>
+              <option value="ใช้งานได้" ${formData.status === 'ใช้งานได้' ? 'selected' : ''}>ใช้งานได้</option>
+              <option value="ใช้งานไม่ได้" ${formData.status === 'ใช้งานไม่ได้' ? 'selected' : ''}>ใช้งานไม่ได้</option>
+              <option value="รอซ่อม" ${formData.status === 'รอซ่อม' ? 'selected' : ''}>รอซ่อม</option>
+              <option value="ชำรุด" ${formData.status === 'ชำรุด' ? 'selected' : ''}>ชำรุด</option>
+              <option value="รอจำหน่าย" ${formData.status === 'รอจำหน่าย' ? 'selected' : ''}>รอจำหน่าย</option>
+              <option value="จำหน่าย" ${formData.status === 'จำหน่าย' ? 'selected' : ''}>จำหน่าย</option>
+            </select>
+          </div>
+          
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium mb-2" style="color: ${config.text_color || defaultConfig.text_color};">รูปภาพครุภัณฑ์</label>
+            <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" onclick="document.getElementById('equipImage').click()">
+              <input type="file" id="equipImage" class="hidden" accept="image/*" onchange="handleFileSelect(event)">
+              <div id="uploadContent">
+                ${formData.image && !currentImageFile ? `
+  <img src="${formData.image.startsWith('http') ? formData.image : formData.image}" class="image-preview mx-auto mb-2" alt="Preview">
+  <p class="text-sm text-gray-600">คลิกหรือลากไฟล์มาวางเพื่อเปลี่ยนรูป</p>
+` : `
+  <div class="text-4xl mb-2">📤</div>
+  <p class="text-sm text-gray-600">คลิกหรือลากไฟล์มาวาง</p>
+  <p class="text-xs text-gray-500 mt-1">รองรับ: JPG, PNG, GIF</p>
+`}
+              </div>
+            </div>
+            <div id="uploadStatus" class="mt-2 text-sm"></div>
+          </div>
+        </div>
+        
+        <div class="flex gap-3 pt-4">
+          <button type="submit" id="submitBtn" class="px-6 py-2 rounded-lg text-white" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+            ${isEdit ? '💾 บันทึกการแก้ไข' : '➕ บันทึกข้อมูล'}
+          </button>
+          <button type="button" onclick="cancelEdit()" class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+            ❌ ยกเลิก
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+    // Helper functions
+    function renderStatCard(title, value, icon, color) {
+      return `
+        <div class="rounded-lg shadow-lg p-4 md:p-6 transform hover:scale-105 transition-transform duration-200" style="background: ${color};">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs md:text-sm text-white opacity-90">${title}</p>
+              <p class="text-xl md:text-3xl font-bold mt-2 text-white">${value}</p>
+            </div>
+            <div class="text-3xl md:text-4xl opacity-80">${icon}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStatusBadge(status) {
+      const colors = {
+        'ใช้งานได้': 'bg-green-100 text-green-800',
+        'ใช้งานไม่ได้': 'bg-gray-600 text-white',
+        'รอซ่อม': 'bg-yellow-100 text-yellow-800',
+        'ชำรุด': 'bg-red-100 text-red-800',
+        'รอจำหน่าย': 'bg-orange-100 text-orange-800',
+        'จำหน่าย': 'bg-purple-100 text-purple-800',
+        'รอดำเนินการ': 'bg-blue-100 text-blue-800',
+        'กำลังซ่อม': 'bg-yellow-100 text-yellow-800',
+        'ซ่อมเสร็จแล้ว': 'bg-green-100 text-green-800',
+        'ไม่สามารถซ่อมได้': 'bg-red-100 text-red-800'
+      };
+      
+      return `<span class="status-badge ${colors[status] || 'bg-gray-100 text-gray-800'}">${status}</span>`;
+    }
+
+function renderBarChart(stats) {
+  const data = [
+    { label: 'ใช้งานได้',       value: stats.available || 0,      color: '#10b981', bg: '#dcfce7' },
+    { label: 'ใช้งานไม่ได้',     value: stats.inoperative || 0,    color: '#6b7280', bg: '#e5e7eb' },
+    { label: 'รอซ่อม',           value: stats.repair || 0,         color: '#f59e0b', bg: '#fef3c7' },
+    { label: 'ชำรุด',           value: stats.broken || 0,         color: '#ef4444', bg: '#fee2e2' },
+    { label: 'รอจำหน่าย',       value: stats.waitingDispose || 0, color: '#fb923c', bg: '#fed7aa' },
+    { label: 'จำหน่าย',         value: stats.disposed || 0,       color: '#9333ea', bg: '#f3e8ff' },
+    { label: 'รอดำเนินการ',     value: stats.pending || 0,        color: '#3b82f6', bg: '#dbeafe' },
+    { label: 'กำลังซ่อม',        value: stats.repairing || 0,      color: '#eab308', bg: '#fef9c3' },
+    { label: 'ซ่อมเสร็จแล้ว',    value: stats.repaired || 0,       color: '#22c55e', bg: '#d9f99d' },
+    { label: 'ไม่สามารถซ่อมได้', value: stats.irreparable || 0,    color: '#dc2626', bg: '#fee2e2' }
+  ];
+
+  const maxValue = Math.max(...data.map(d => d.value), 1);
+
+  return `
+    <div class="flex flex-col max-h-96 overflow-y-auto gap-4 py-4 px-2">
+      ${data.map(item => `
+        <div class="flex items-center gap-4">
+          <span class="text-sm w-36 text-right shrink-0 font-medium">${item.label}</span>
+          <div class="flex-1 relative h-10 rounded-full overflow-hidden" style="background-color: ${item.bg};">
+            <div class="absolute inset-0 rounded-full flex items-center justify-end pr-4 text-white text-sm font-bold shadow-md transition-all duration-500"
+                 style="width: ${(item.value / maxValue * 100)}%; background-color: ${item.color}; min-width: ${item.value > 0 ? '3em' : '0'};">
+              ${item.value > 0 ? item.value : ''}
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+    function renderPieChart(dataSet) {
+      const locationValues = {};
+      dataSet.forEach(item => {
+        locationValues[item.location] = (locationValues[item.location] || 0) + item.price;
+      });
+      
+      const total = Object.values(locationValues).reduce((a, b) => a + b, 0);
+      const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+      
+      return `
+        <div class="flex flex-col h-full justify-center gap-3">
+          ${Object.entries(locationValues).map(([location, value], index) => {
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return `
+              <div class="flex items-center gap-3">
+                <div class="w-4 h-4 rounded" style="background-color: ${colors[index % colors.length]};"></div>
+                <div class="flex-1">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span>${location}</span>
+                    <span class="font-medium">${percentage}%</span>
+                  </div>
+                  <div class="bg-gray-200 rounded-full h-2">
+                    <div class="h-full rounded-full" style="width: ${percentage}%; background-color: ${colors[index % colors.length]};"></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function calculateStats(dataSet) {
+      return {
+        total: dataSet.length,
+        available: dataSet.filter(item => item.status === 'ใช้งานได้').length,
+        repair: dataSet.filter(item => item.status === 'รอซ่อม').length,
+        broken: dataSet.filter(item => item.status === 'ชำรุด').length,
+        disposed: dataSet.filter(item => item.status === 'จำหน่าย').length
+      };
+    }
+
+    function getPageTitle() {
+      const titles = {
+        dashboard: 'แดชบอร์ด',
+        reports: 'รายงาน',
+        repair: 'แจ้งซ่อมครุภัณฑ์',
+        inspection: 'ตรวจสอบครุภัณฑ์ประจำปี',
+        equipmentList: 'รายการครุภัณฑ์ทั้งหมด', 
+        repairManagement: 'จัดการการซ่อม',
+        add: editingEquipment ? 'แก้ไขข้อมูล' : 'เพิ่มข้อมูลใหม่',
+        users: 'จัดการผู้ใช้',
+        settings: 'ตั้งค่าระบบ'
+      };
+      return titles[currentPage] || 'แดชบอร์ด';
+    }
+
+    // File upload handlers
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('uploadArea').classList.add('dragover');
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('uploadArea').classList.remove('dragover');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('uploadArea').classList.remove('dragover');
+      
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    }
+
+    function handleFileSelect(e) {
+      const files = e.target.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    }
+
+    async function processFile(file) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      
+      if (!allowedTypes.includes(file.type)) {
+        showToast('❌ ประเภทไฟล์ไม่ถูกต้อง กรุณาเลือกไฟล์รูปภาพ (JPG, PNG, GIF)', 'error');
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('❌ ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 5MB)', 'error');
+        return;
+      }
+      
+      currentImageFile = file;
+      
+      const uploadContent = document.getElementById('uploadContent');
+      const uploadStatus = document.getElementById('uploadStatus');
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        uploadContent.innerHTML = `
+          <img src="${e.target.result}" class="image-preview mx-auto mb-2" alt="Preview">
+          <p class="text-sm text-gray-600">คลิกหรือลากไฟล์มาวางเพื่อเปลี่ยนรูป</p>
+          <p class="text-xs text-green-600 mt-1">✓ ${file.name}</p>
+        `;
+      };
+      reader.readAsDataURL(file);
+      
+      uploadStatus.innerHTML = '<span class="text-green-600">✓ ไฟล์พร้อมบันทึก</span>';
+    }
+
+    function viewImage(imageUrl) {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+      modal.onclick = () => modal.remove();
+      
+      modal.innerHTML = `
+        <div class="max-w-4xl max-h-full">
+          <img src="${imageUrl}" alt="Image" class="max-w-full max-h-[90vh] object-contain rounded-lg">
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    }
+
+    function openInspectionModal(equipmentId) {
+      const equipment = equipmentData.find(item => item.id === equipmentId);
+      if (!equipment) return;
+      
+      const currentYear = new Date().getFullYear() + 543;
+      
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <h3 class="text-lg font-semibold mb-4" style="color: ${config.text_color || defaultConfig.text_color};">บันทึกการตรวจสอบครุภัณฑ์</h3>
+          
+          <form id="inspectionModalForm" class="space-y-4" onsubmit="return false;">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-2">รหัสครุภัณฑ์</label>
+                <input type="text" value="${equipment.id}" class="w-full px-4 py-2 border rounded-lg bg-gray-100" readonly>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium mb-2">ชื่อครุภัณฑ์</label>
+                <input type="text" value="${equipment.name}" class="w-full px-4 py-2 border rounded-lg bg-gray-100" readonly>
+              </div>
+              
+              <div>
+                <label for="modalInspectionDate" class="block text-sm font-medium mb-2">วันที่ตรวจสอบ</label>
+               <input type="date" id="modalInspectionDate" class="w-full px-4 py-2 border rounded-lg" required>
+              </div>
+              
+              <div>
+                <label for="modalInspectionYear" class="block text-sm font-medium mb-2">ปีงบประมาณ</label>
+                <select id="modalInspectionYear" class="w-full px-4 py-2 border rounded-lg" required>
+                  <option value="${currentYear}">${currentYear}</option>
+                  <option value="${currentYear - 1}">${currentYear - 1}</option>
+                  <option value="${currentYear + 1}">${currentYear + 1}</option>
+                </select>
+              </div>
+              
+              <div class="md:col-span-2">
+                <label for="modalInspectionCondition" class="block text-sm font-medium mb-2">สภาพครุภัณฑ์</label>
+                <select id="modalInspectionCondition" class="w-full px-4 py-2 border rounded-lg" required>
+                  <option value="ใช้งานได้">ใช้งานได้</option>
+                  <option value="ใช้งานไม่ได้">ใช้งานไม่ได้</option>
+                  <option value="ชำรุด">ชำรุด</option>
+                  <option value="รอซ่อม">รอซ่อม</option>
+                  <option value="รอจำหน่าย">รอจำหน่าย</option>
+                  <option value="จำหน่าย">จำหน่าย</option>
+                </select>
+              </div>
+              
+              <div class="md:col-span-2">
+                <label for="modalInspectionNote" class="block text-sm font-medium mb-2">หมายเหตุ</label>
+                <textarea id="modalInspectionNote" class="w-full px-4 py-2 border rounded-lg" rows="3" placeholder="บันทึกข้อสังเกต..."></textarea>
+              </div>
+            </div>
+            
+            <div class="flex gap-3 justify-end pt-4">
+              <button type="button" onclick="this.closest('.fixed').remove()" class="px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+                ยกเลิก
+              </button>
+              <button type="submit" class="px-6 py-2 rounded-lg text-white" style="background-color: ${config.primary_color || defaultConfig.primary_color};">
+                บันทึกการตรวจสอบ
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      document.getElementById('modalInspectionDate').valueAsDate = new Date();
+      
+      document.getElementById('inspectionModalForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleInspectionModalSubmit(equipmentId);
+      });
+    }
+
+    function handleInspectionModalSubmit(equipmentId) {
+      const equipment = equipmentData.find(item => item.id === equipmentId);
+      const date = document.getElementById('modalInspectionDate').value;
+      const year = document.getElementById('modalInspectionYear').value;
+      const condition = document.getElementById('modalInspectionCondition').value;
+      const note = document.getElementById('modalInspectionNote').value;
+      
+      const inspectionData = {
+        equipmentId: equipmentId,
+        equipmentName: equipment.name,
+        inspectionDate: date,
+        inspector: currentUser.name,
+        condition: condition,
+        note: note,
+        year: year,
+        owner: currentUser.username
+      };
+      
+      saveInspectionRecord(inspectionData);
+    }
+
+    function selectTheme(primary, secondary) {
+      document.getElementById('settingPrimaryColor').value = primary;
+      document.getElementById('settingPrimaryColorText').value = primary;
+      document.getElementById('settingSecondaryColor').value = secondary;
+      document.getElementById('settingSecondaryColorText').value = secondary;
+      
+      const elements = document.querySelectorAll('.theme-preview');
+      elements.forEach(el => el.classList.remove('selected'));
+      event.target.closest('.theme-preview')?.classList.add('selected');
+    }
+function printReport() {
+  let filteredData = equipmentData;
+
+  // กรองตามสิทธิ์ผู้ใช้
+  if (currentUser?.role === 'user') {
+    filteredData = filteredData.filter(item =>
+      item.owner === currentUser.username || item.responsible === currentUser.name
+    );
+  }
+
+  // กรองตามตัวกรอง
+  if (filters.name) filteredData = filteredData.filter(item => item.name.toLowerCase().includes(filters.name.toLowerCase()));
+  if (filters.code) filteredData = filteredData.filter(item => item.id.includes(filters.code));
+  if (filters.type && filters.type !== 'ทุกกลุ่มสาระ') filteredData = filteredData.filter(item => item.department === filters.type);
+  if (filters.responsible) filteredData = filteredData.filter(item => item.responsible.toLowerCase().includes(filters.responsible.toLowerCase()));
+  if (filters.room) filteredData = filteredData.filter(item => item.location.toLowerCase().includes(filters.room.toLowerCase()));
+  if (filters.status !== 'ทุกสถานะ') filteredData = filteredData.filter(item => item.status === filters.status);
+
+  // ฟังก์ชันแปลงราคาที่มี comma ให้เป็นตัวเลขถูกต้อง
+  function getCleanPrice(priceValue) {
+    if (!priceValue) return 0;
+    const cleaned = String(priceValue).replace(/,/g, ''); // ลบ comma ทั้งหมด
+    return parseFloat(cleaned) || 0;
+  }
+
+  // สร้างแถวข้อมูล
+  const tableRows = filteredData.map((item, index) => {
+    const price = getCleanPrice(item.price);
+    const quantity = parseInt(item.quantity || 1) || 1;
+
+    let sendRepair = '';
+    let shouldDispose = '';
+
+    if (['รอซ่อม', 'ชำรุด'].includes(item.status)) sendRepair = '✓';
+    else if (item.status === 'ใช้งานไม่ได้') sendRepair = '';
+
+    if (['รอจำหน่าย', 'จำหน่าย'].includes(item.status)) shouldDispose = '✓';
+
+    return `<tr>
+      <td style="text-align: center;">${index + 1}</td>
+      <td>${item.id || '-'}</td>
+      <td>${item.name || '-'}</td>
+      <td style="text-align: center;">${item.date || '-'}</td>
+      <td style="text-align: center;">${quantity}</td>
+      <td style="text-align: center;">${item.unit || '-'}</td>
+      <td style="text-align: right;">${price.toLocaleString('th-TH')}</td>
+      <td>${item.budget || '-'}</td>
+      <td>${item.location || '-'}</td>
+      <td>${item.department || '-'}</td>
+      <td style="text-align: center;">${item.status || '-'}</td>
+      <td style="text-align: center; font-weight: bold;">${sendRepair}</td>
+      <td style="text-align: center; font-weight: bold;">${shouldDispose}</td>
+      <td>${item.responsible || '-'}</td>
+    </tr>`;
+  }).join('');
+
+  // คำนวณมูลค่ารวมถูกต้อง
+  const totalValue = filteredData.reduce((sum, item) => {
+    const price = getCleanPrice(item.price);
+    const quantity = parseInt(item.quantity || 1) || 1;
+    return sum + (price * quantity);
+  }, 0);
+
+  const currentDate = new Date().toLocaleDateString('th-TH', { 
+    year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  const orgName = config.organization_name || 'โรงเรียน/หน่วยงาน';
+  const userName = currentUser?.name || '';
+  const logoUrl = config.logo_url || '';
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    showToast('❌ กรุณาอนุญาต Popup', 'error');
+    return;
+  }
+
+  printWindow.document.write(`
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>รายงานครุภัณฑ์</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Kanit', sans-serif; padding: 15px; margin: 0; }
+    .header { text-align: center; margin-bottom: 10px; }
+    .header img { max-height: 45px; max-width: 140px; margin-bottom: 3px; object-fit: contain; }
+    .header h1 { font-size: 22px; font-weight: 700; margin: 3px 0; }
+    .header h2 { font-size: 18px; font-weight: 500; margin: 3px 0; }
+    .header p { font-size: 14px; color: #666; margin: 3px 0; }
+    .info-section { display: flex; justify-content: space-between; margin: 10px 0; font-size: 15px; font-weight: 500; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+    th, td { border: 1px solid #000; padding: 6px; text-align: left; vertical-align: middle; }
+    th { background: #f0f0f0; text-align: center; font-weight: 600; }
+    .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+    .signature { text-align: center; width: 30%; }
+    .signature-line { border-top: 1px solid #000; margin: 50px auto 5px; width: 200px; }
+    .print-btn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; z-index: 1000; }
+    @media print { 
+      body { padding: 10px !important; } 
+      .print-btn { display: none; } 
+      .header img { max-height: 80px; }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨️ พิมพ์เอกสาร</button>
+
+  <div class="header">
+    ${logoUrl ? `<img src="${logoUrl}" alt="โลโก้โรงเรียน" onerror="this.style.display='none'">` : ''}
+    <h1>${orgName}</h1>
+    <h2>รายงานครุภัณฑ์</h2>
+    <p>วันที่พิมพ์: ${currentDate}</p>
+  </div>
+
+  <div class="info-section">
+    <div>จำนวนครุภัณฑ์: <strong>${filteredData.length} รายการ</strong></div>
+    <div>มูลค่ารวม: <strong>${totalValue.toLocaleString('th-TH')} บาท</strong></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2">ลำดับ</th>
+        <th rowspan="2">รหัส</th>
+        <th rowspan="2">ชื่อครุภัณฑ์</th>
+        <th rowspan="2">วันที่ได้มา</th>
+        <th rowspan="2">จำนวน</th>
+        <th rowspan="2">หน่วย</th>
+        <th rowspan="2">ราคา (บาท)</th>
+        <th rowspan="2">งบประมาณ</th>
+        <th rowspan="2">สถานที่</th>
+        <th rowspan="2">กลุ่มสาระ/งาน</th>
+        <th rowspan="2">สถานะ</th>
+        <th colspan="2">แนวทางดำเนินการ</th>
+        <th rowspan="2">ผู้รับผิดชอบ</th>
+      </tr>
+      <tr>
+        <th>ส่งซ่อม</th>
+        <th>ควรจำหน่าย</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+
+  <div class="footer">
+    <div class="signature">
+      <div>ผู้จัดทำรายงาน</div>
+      <div class="signature-line">(${userName})</div>
+      <div>วันที่ ...... / ...... / ......</div>
+    </div>
+    <div class="signature">
+      <div>ผู้ตรวจสอบ</div>
+      <div class="signature-line">(...............................................)</div>
+      <div>วันที่ ...... / ...... / ......</div>
+    </div>
+    <div class="signature">
+      <div>ผู้อนุมัติ</div>
+      <div class="signature-line">(...............................................)</div>
+      <div>วันที่ ...... / ...... / ......</div>
+    </div>
+  </div>
+</body>
+</html>
+  `);
+
+  printWindow.document.close();
+}
+
+
+function printInspectionReport() {
+  let filteredData = inspectionRecords;
+
+  if (currentUser?.role === 'user') {
+    filteredData = inspectionRecords.filter(rec => rec.owner === currentUser.username);
+  }
+
+  // สร้างรายชื่อผู้รับผิดชอบ
+  const responsibleMap = {};
+  filteredData.forEach(rec => {
+    const equipment = equipmentData.find(eq => eq.id === rec.equipmentId);
+    const responsible = equipment?.responsible || '-';
+    if (!responsibleMap[responsible]) {
+      responsibleMap[responsible] = { name: responsible, count: 0 };
+    }
+    responsibleMap[responsible].count++;
+  });
+
+  const sortedResponsible = Object.values(responsibleMap).sort((a, b) => b.count - a.count);
+  const responsibleText = sortedResponsible.length > 0
+    ? sortedResponsible.map((person, index) => `${index + 1}. ${person.name} (${person.count} รายการ)`).join(' • ')
+    : 'ไม่มีข้อมูล';
+
+  const currentDate = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const orgName = config.organization_name || defaultConfig.organization_name;
+  const userName = currentUser?.name || '';
+
+  // แปลงราคาให้ถูกต้องโดยลบ comma ออกก่อน parse
+function cleanPrice(priceStr) {
+  if (!priceStr) return 0;
+  // ถ้าเป็น string ที่มี comma เช่น "12,500" หรือ "1,234.56"
+  const cleaned = String(priceStr).replace(/,/g, '');
+  return parseFloat(cleaned) || 0;
+}
+
+// สร้างแถวข้อมูล
+const tableRows = filteredData.map((item, index) => {
+  const price = cleanPrice(item.price);
+  const quantity = parseInt(item.quantity || 1) || 1;
+
+  let sendRepair = '';
+  let shouldDispose = '';
+
+  if (['รอซ่อม', 'ชำรุด'].includes(item.status)) sendRepair = '✓';
+  else if (item.status === 'ใช้งานไม่ได้') sendRepair = '';
+
+  if (['รอจำหน่าย', 'จำหน่าย'].includes(item.status)) shouldDispose = '✓';
+
+  return `<tr>
+    <td style="text-align: center;">${index + 1}</td>
+    <td>${item.id || '-'}</td>
+    <td>${item.name || '-'}</td>
+    <td style="text-align: center;">${item.date || '-'}</td>
+    <td style="text-align: center;">${quantity}</td>
+    <td style="text-align: center;">${item.unit || '-'}</td>
+    <td style="text-align: right;">${price.toLocaleString('th-TH')}</td>
+    <td>${item.budget || '-'}</td>
+    <td>${item.location || '-'}</td>
+    <td>${item.department || '-'}</td>
+    <td style="text-align: center;">${item.status || '-'}</td>
+    <td style="text-align: center; font-weight: bold;">${sendRepair}</td>
+    <td style="text-align: center; font-weight: bold;">${shouldDispose}</td>
+    <td>${item.responsible || '-'}</td>
+  </tr>`;
+}).join('');
+
+// คำนวณมูลค่ารวม (ใช้ cleanPrice เช่นกัน)
+const totalValue = filteredData.reduce((sum, item) => {
+  const price = cleanPrice(item.price);
+  const quantity = parseInt(item.quantity || 1) || 1;
+  return sum + (price * quantity);
+}, 0);
+
+const logoUrl = config.logo_url || '';
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>รายงานการตรวจสอบครุภัณฑ์ประจำปี</title>
+  <!-- เปลี่ยนไปใช้ฟอนต์ที่ติดตั้งในเครื่องไทยแน่นอน -->
+
+  <style>
+    * { 
+      font-family: "TH Sarabun New",sans-serif !important; 
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box; 
+    }
+    body { padding: 40px; background: white; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header img { max-height: 90px; max-width: 280px; margin-bottom: 3px; object-fit: contain; }
+    .header h1 { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+    .header h2 { font-size: 15px; font-weight: 500; margin-bottom: 10px; }
+    .header p { font-size: 14px; color: #666; }
+    .responsible-section { margin: 20px 0; padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center; }
+    .responsible-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #1f2937; }
+    .responsible-text { font-size: 13px; color: #374151; line-height: 1.6; }
+    .info-section { margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 14px; color: #000; }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 13px; 
+      margin-top: 20px; 
+    }
+    th, td { 
+      border: 1px solid #000 !important;   /* บังคับให้แสดงเส้นแน่นอน */
+      padding: 8px; 
+      text-align: left; 
+      color: #000; 
+    }
+    th { 
+      background-color: #f0f0f0; 
+      font-weight: 700; 
+      text-align: center; 
+    }
+    .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 14px; color: #000; }
+    .signature { text-align: center; }
+    .signature-line { border-top: 1px solid #000; margin-top: 60px; padding-top: 5px; }
+    @media print { 
+      body { padding: 20px; } 
+      .print-btn { display: none; } 
+    }
+    .print-btn { 
+      position: fixed; 
+      top: 20px; 
+      right: 20px; 
+      padding: 10px 20px; 
+      background: #3b82f6; 
+      color: white; 
+      border: none; 
+      border-radius: 5px; 
+      cursor: pointer; 
+      font-size: 14px; 
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .print-btn:hover { background: #2563eb; }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨️ พิมพ์เอกสาร</button>
+
+  <div class="header">
+     ${logoUrl ? `<img src="${logoUrl}" alt="โลโก้โรงเรียน" onerror="this.style.display='none'">` : ''}
+    <h1>${orgName}</h1>
+    <h2>รายงานการตรวจสอบครุภัณฑ์ประจำปี</h2>
+    <p>วันที่พิมพ์: ${currentDate}</p>
+  </div>
+
+  <div class="responsible-section">
+    <h3>รายชื่อผู้รับผิดชอบครุภัณฑ์</h3>
+    <p class="responsible-text">${responsibleText}</p>
+  </div>
+
+  <div class="info-section">
+    <div>จำนวนรายการที่ตรวจสอบ: <strong>${filteredData.length} รายการ</strong></div>
+    <div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 4%;">ลำดับ</th>
+        <th style="width: 20%;">รหัสครุภัณฑ์</th>
+        <th style="width: 22%;">ชื่อครุภัณฑ์</th>
+        <th style="width: 10%;">วันที่ตรวจสอบ</th>
+        <th style="width: 10%;">ปีงบประมาณ</th>
+        <th style="width: 10%;">สภาพครุภัณฑ์</th>
+        <th style="width: 12%;">ผู้ตรวจสอบ</th>
+        <th style="width: 10%;">หมายเหตุ</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+
+  <div class="footer">
+    <div class="signature">
+      <div>ผู้จัดทำรายงาน</div>
+      <div class="signature-line">(${userName})</div>
+      <div>วันที่ ......./......./......</div>
+    </div>
+    <div class="signature">
+      <div>ผู้ตรวจสอบ</div>
+      <div class="signature-line">(...............................................)</div>
+      <div>วันที่ ......./......./......</div>
+    </div>
+    <div class="signature">
+      <div>ผู้อนุมัติ</div>
+      <div class="signature-line">(...............................................)</div>
+      <div>วันที่ ......./......./......</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  // ใช้วิธี Blob เพื่อไม่ให้ถูกบล็อก
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const newWindow = window.open(url, '_blank');
+
+  if (!newWindow) {
+    showToast('เบราว์เซอร์บล็อกการเปิดหน้าต่างใหม่ กรุณาอนุญาต Popup', 'error');
+  }
+}
+
+    function canEdit(item) {
+      if (currentUser?.role === 'admin') return true;
+      return false;
+    }
+
+    // Event handlers
+    function attachLoginListeners() {
+      const form = document.getElementById('loginForm');
+      if (form) {
+        form.addEventListener('submit', handleLogin);
+      }
+    }
+
+    function attachEventListeners() {
+      const repairForm = document.getElementById('repairForm');
+      if (repairForm) {
+        repairForm.addEventListener('submit', handleRepairSubmit);
+      }
+      
+      const equipmentForm = document.getElementById('equipmentForm');
+      if (equipmentForm) {
+        equipmentForm.addEventListener('submit', handleEquipmentSubmit);
+      }
+      
+      const userForm = document.getElementById('userForm');
+      if (userForm) {
+        userForm.addEventListener('submit', handleUserSubmit);
+      }
+      
+      const primaryColor = document.getElementById('settingPrimaryColor');
+      const primaryColorText = document.getElementById('settingPrimaryColorText');
+      if (primaryColor && primaryColorText) {
+        primaryColor.addEventListener('input', (e) => {
+          primaryColorText.value = e.target.value;
+        });
+        primaryColorText.addEventListener('input', (e) => {
+          if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+            primaryColor.value = e.target.value;
+          }
+        });
+      }
+      
+      const secondaryColor = document.getElementById('settingSecondaryColor');
+      const secondaryColorText = document.getElementById('settingSecondaryColorText');
+      if (secondaryColor && secondaryColorText) {
+        secondaryColor.addEventListener('input', (e) => {
+          secondaryColorText.value = e.target.value;
+        });
+        secondaryColorText.addEventListener('input', (e) => {
+          if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+            secondaryColor.value = e.target.value;
+          }
+        });
+      }
+      
+      const repairDate = document.getElementById('repairDate');
+      if (repairDate && !repairDate.value) {
+        repairDate.valueAsDate = new Date();
+      }
+    }
+
+    function handleUserSubmit(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('userUsername').value;
+      const password = document.getElementById('userPassword').value;
+      const role = document.getElementById('userRole').value;
+      const name = document.getElementById('userName').value;
+      
+      const userData = {
+        username: username,
+        password: password || null,
+        role: role,
+        name: name,
+        isEdit: !!editingUser
+      };
+      
+      saveUser(userData);
+    }
+    
+    function editUser(username) {
+      editingUser = username;
+      render();
+    }
+    
+    function cancelEditUser() {
+      editingUser = null;
+      render();
+    }
+
+    function deleteUser(username) {
+      const confirmDiv = document.createElement('div');
+      confirmDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      
+      const user = userData.find(u => u.username === username);
+      
+      confirmDiv.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full">
+          <h3 class="text-lg font-semibold mb-4">ยืนยันการลบผู้ใช้</h3>
+          <p class="text-gray-600 mb-6">คุณต้องการลบผู้ใช้ ${user?.name} ใช่หรือไม่?</p>
+          <div class="flex gap-3 justify-end">
+            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+              ยกเลิก
+            </button>
+            <button onclick="confirmDeleteUser('${username}')" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+              ลบ
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(confirmDiv);
+    }
+
+    function confirmDeleteUser(username) {
+      const confirmDiv = document.querySelector('.fixed.inset-0');
+      if (confirmDiv) confirmDiv.remove();
+      
+      removeUser(username);
+    }
+
+    function updateRepairStatus(repairId, newStatus) {
+      updateRepairStatusData(repairId, newStatus);
+    }
+
+    function viewRepairDetail(repairId) {
+      const repair = repairRequests.find(r => r.id === repairId);
+      if (!repair) return;
+      
+      const user = userData.find(u => u.username === repair.owner);
+      
+      const detailDiv = document.createElement('div');
+      detailDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      detailDiv.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+          <h3 class="text-lg font-semibold mb-4">รายละเอียดการแจ้งซ่อม</h3>
+          <div class="space-y-3 text-sm">
+            <div><span class="font-medium">รหัสซ่อม:</span> ${repair.id}</div>
+            <div><span class="font-medium">ครุภัณฑ์:</span> ${repair.equipmentName}</div>
+            <div><span class="font-medium">รหัสครุภัณฑ์:</span> ${repair.equipmentId}</div>
+            <div><span class="font-medium">ผู้แจ้ง:</span> ${user?.name || '-'}</div>
+            <div><span class="font-medium">วันที่แจ้ง:</span> ${repair.date}</div>
+            <div><span class="font-medium">รายละเอียดปัญหา:</span> ${repair.description}</div>
+            <div><span class="font-medium">สถานะ:</span> ${renderStatusBadge(repair.status)}</div>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" class="mt-6 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            ปิด
+          </button>
+        </div>
+      `;
+      
+      document.body.appendChild(detailDiv);
+    }
+
+function saveSettings() {
+  const systemName = document.getElementById('settingSystemName').value;
+  const orgName = document.getElementById('settingOrgName').value;
+  const logoUrl = document.getElementById('settingLogoUrl').value;
+  const primaryColor = document.getElementById('settingPrimaryColor').value;
+  const secondaryColor = document.getElementById('settingSecondaryColor').value;
+
+  // เพิ่มบรรทัดนี้ (ถ้าเป็น admin เท่านั้นถึงจะมี element นี้)
+  const inspectionEnabled = currentUser?.role === 'admin' 
+    ? (document.getElementById('inspectionMenuToggle')?.checked ?? true) 
+    : config.inspection_menu_enabled;
+
+  const newConfig = {
+    system_name: systemName,
+    organization_name: orgName,
+    logo_url: logoUrl,
+    primary_color: primaryColor,
+    secondary_color: secondaryColor,
+    sidebar_color: primaryColor,
+    inspection_menu_enabled: inspectionEnabled
+  };
+
+  saveConfig(newConfig);
+}
+
+    function exportData() {
+      const data = {
+        equipment: equipmentData,
+        repairs: repairRequests,
+        inspections: inspectionRecords,
+        users: userData.map(u => ({ username: u.username, name: u.name, role: u.role })),
+        exportDate: new Date().toISOString()
+      };
+      
+      const dataStr = JSON.stringify(data, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `equipment-data-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      
+      URL.revokeObjectURL(url);
+      showToast('📥 ส่งออกข้อมูลเรียบร้อยแล้ว', 'success');
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          if (result.success) {
+            currentUser = result.user;
+            currentPage = 'dashboard';
+            loadAllData();
+          } else {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center';
+            messageDiv.textContent = '❌ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+            
+            const form = document.getElementById('loginForm');
+            const existing = form.parentElement.querySelector('.bg-red-100');
+            if (existing) existing.remove();
+            
+            form.parentElement.appendChild(messageDiv);
+            
+            setTimeout(() => messageDiv.remove(), 3000);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Login error:', error);
+          hideLoading();
+          showToast('❌ เกิดข้อผิดพลาดในการเข้าสู่ระบบ', 'error');
+        })
+        .loginUser(username, password);
+    }
+
+    function handleRepairSubmit(e) {
+      e.preventDefault();
+      
+      const equipmentId = document.getElementById('repairEquipment').value;
+      const date = document.getElementById('repairDate').value;
+      const description = document.getElementById('repairDescription').value;
+      
+      const equipment = equipmentData.find(item => item.id === equipmentId);
+      
+      const repairData = {
+        equipmentId: equipmentId,
+        equipmentName: equipment.name,
+        date: date,
+        description: description,
+        status: 'รอดำเนินการ',
+        owner: currentUser.username
+      };
+      
+      saveRepairRequest(repairData);
+    }
+
+ async function handleEquipmentSubmit(e) {
+  e.preventDefault();
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'กำลังบันทึก...';
+
+  let imageValue = '';
+
+  if (currentImageFile) {
+    // มีการเลือกรูปใหม่ → ส่ง Base64 เพื่อให้ server อัปโหลดไป Drive
+    showToast('📤 กำลังประมวลผลรูปภาพ...', 'info');
+    imageValue = await fileToBase64(currentImageFile);
+    showToast('✅ เตรียมรูปภาพเรียบร้อย', 'success');
+  } else if (editingEquipment) {
+    // กำลังแก้ไข และไม่ได้เลือกรูปใหม่ → ส่ง URL รูปเดิม (ถ้ามี)
+    const existingItem = equipmentData.find(item => item.id === editingEquipment);
+    imageValue = existingItem?.image || '';
+  }
+  // ถ้าเพิ่มใหม่และไม่มีรูป → imageValue = ''
+
+  const formData = {
+    id: document.getElementById('equipId').value.trim(),
+    name: document.getElementById('equipName').value,
+    date: document.getElementById('equipDate').value,
+    quantity: parseInt(document.getElementById('equipQuantity').value),
+    unit: document.getElementById('equipUnit').value,
+    price: parseFloat(document.getElementById('equipPrice').value),
+    budget: document.getElementById('equipBudget').value,
+    location: document.getElementById('equipLocation').value,
+    department: document.getElementById('equipDepartment').value,
+    responsible: document.getElementById('equipResponsible').value,
+    status: document.getElementById('equipStatus').value,
+    condition: document.getElementById('equipStatus').value, // หรือแยก field ถ้ามี
+    image: imageValue,  // ส่ง Base64 เฉพาะเมื่อมีรูปใหม่ หรือ URL เดิม
+    owner: currentUser.username,
+    isEdit: !!editingEquipment
+  };
+
+  saveEquipment(formData);
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = editingEquipment ? '💾 บันทึกการแก้ไข' : '➕ บันทึกข้อมูล';
+}
+
+    function showToast(message, type = 'success') {
+      let bgColor;
+      
+      if (type === 'success') {
+        bgColor = config.accent_color || defaultConfig.accent_color;
+      } else if (type === 'error') {
+        bgColor = '#ef4444';
+      } else if (type === 'info') {
+        bgColor = '#3b82f6';
+      }
+      
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white shadow-lg z-50';
+      toast.style.backgroundColor = bgColor;
+      toast.textContent = message;
+      
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // Navigation functions
+    function navigateTo(page) {
+      currentPage = page;
+      sidebarOpen = false;
+      editingEquipment = null;
+      editingUser = null;
+      render();
+    }
+
+    function toggleSidebar() {
+      sidebarOpen = !sidebarOpen;
+      render();
+    }
+
+    function logout() {
+      currentUser = null;
+      currentPage = 'login';
+      editingEquipment = null;
+      editingUser = null;
+      equipmentData = [];
+      repairRequests = [];
+      inspectionRecords = [];
+      userData = [];
+      render();
+    }
+
+function editEquipment(id) {
+  if (!id) return;
+
+  showLoading();
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      equipmentData = result.equipment || [];
+      userData = result.users || [];
+      repairRequests = result.repairs || [];
+      inspectionRecords = result.inspections || [];
+
+      editingEquipment = id;
+      hideLoading();
+
+      currentPage = 'add';
+      render(); // render ใหม่หลังข้อมูลครบ
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error loading data:', error);
+      hideLoading();
+      showToast('❌ ไม่สามารถโหลดข้อมูลได้', 'error');
+    })
+    .getAllData();
+} 
+
+
+    function deleteEquipment(id) {
+      const item = equipmentData.find(eq => eq.id === id);
+      if (!item || !canEdit(item)) return;
+      
+      const confirmDiv = document.createElement('div');
+      confirmDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      confirmDiv.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full">
+          <h3 class="text-lg font-semibold mb-4">ยืนยันการลบ</h3>
+          <p class="text-gray-600 mb-6">คุณต้องการลบครุภัณฑ์ ${item.name} ใช่หรือไม่?</p>
+          <div class="flex gap-3 justify-end">
+            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+              ยกเลิก
+            </button>
+            <button onclick="confirmDelete('${id}')" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+              ลบ
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(confirmDiv);
+    }
+
+    function confirmDelete(id) {
+      const confirmDiv = document.querySelector('.fixed.inset-0');
+      if (confirmDiv) confirmDiv.remove();
+      
+      removeEquipment(id);
+    }
+
+    function cancelEdit() {
+      editingEquipment = null;
+      currentImageFile = null;
+      navigateTo('reports');
+    }
+
+    function applyFilters() {
+      filters.name = document.getElementById('filterName').value;
+      filters.code = document.getElementById('filterCode').value;
+      filters.type = document.getElementById('filterType').value;
+      filters.responsible = document.getElementById('filterResponsible').value;
+      filters.room = document.getElementById('filterRoom').value;
+      filters.status = document.getElementById('filterStatus').value;
+      render();
+    }
+
+    function clearFilters() {
+      filters = {
+        name: '',
+        code: '',
+        type: '',
+        responsible: '',
+        room: '',
+        status: 'ทุกสถานะ'
+      };
+      render();
+    }
+
+    // Initialize
+    loadConfig();
+    loadAllData();
+    render();
+  </script>
+ </body>
+</html>
