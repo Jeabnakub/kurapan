@@ -3,268 +3,265 @@
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบรับเรื่องร้องเรียน/ร้องทุกข์</title>
+  <title>ระบบแจ้งกรณีไม่พบข้อมูลในระบบ EWORKPERMIT</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
   <style>
-    *{font-family:'DM Sans',sans-serif}
-    :root{--g9:#052e16;--g7:#166534;--g5:#16a34a;--g4:#22c55e}
-    .sidebar{width:260px;background:linear-gradient(175deg,#052e16,#14532d 40%,#166534);position:relative;overflow:hidden}
-    .sidebar::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 80%,rgba(34,197,94,.12) 0%,transparent 50%);pointer-events:none}
-    .nav-btn{transition:all .25s;border-radius:12px;color:rgba(255,255,255,.55)}
-    .nav-btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.9)}
-    .nav-btn.active{background:rgba(255,255,255,.15);color:#fff;font-weight:600}
-    .logo-mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
-    .card{background:#fff;border-radius:18px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 6px 24px rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.04)}
-    .fi{transition:all .2s;background:#fafbfa;border:1.5px solid #e5e7eb;border-radius:12px}
-    .fi:focus{border-color:var(--g5);box-shadow:0 0 0 3px rgba(22,163,74,.08);background:#fff;outline:none}
-    select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:40px}
-    .bp{background:linear-gradient(135deg,var(--g7),var(--g5));color:#fff;border-radius:12px;font-weight:600;box-shadow:0 4px 14px rgba(22,101,52,.25);transition:all .25s}
-    .bp:hover{box-shadow:0 6px 20px rgba(22,101,52,.35);transform:translateY(-1px)}
-    .bs{background:#fff;border:1.5px solid #e5e7eb;border-radius:12px;font-weight:500;transition:all .2s}
-    .bs:hover{background:#f9fafb;border-color:#d1d5db}
-    .vhdr{background:rgba(255,255,255,.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,0,0,.04)}
-    .fade{animation:fu .35s ease}
-    @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-    .mo{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fu .2s}
-    .mo-box{background:#fff;border-radius:20px;padding:32px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-    .mo-ic{width:56px;height:56px;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px}
-    .mo-ic.s{background:#dcfce7;color:#16a34a}.mo-ic.e{background:#fee2e2;color:#dc2626}.mo-ic.w{background:#fef3c7;color:#d97706}.mo-ic.l{background:#dbeafe;color:#2563eb}
-    @keyframes sp{to{transform:rotate(360deg)}}.spin{animation:sp .8s linear infinite}
-    .rh{background:linear-gradient(135deg,#052e16,#166534,#15803d);position:relative;overflow:hidden}
-    .ic{background:#f8faf8;border-radius:12px;padding:12px 14px;border:1px solid rgba(0,0,0,.03)}
-    .sh{background:linear-gradient(135deg,#052e16,#166534,#15803d);border-radius:20px;position:relative;overflow:hidden}
-    .sh::before{content:'';position:absolute;top:-40%;right:-15%;width:280px;height:280px;border-radius:50%;background:rgba(34,197,94,.1)}
-    .icard,.scard{border-radius:16px;transition:all .25s;border:1px solid}
-    .icard:hover,.scard:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.06)}
-    .scard{text-align:center}
-    .dg{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent)}
-    @media(max-width:768px){.sidebar{display:none}}
+    :root {
+      --ink: #0f172a;
+      --primary-vibrant: #0284c7;
+      --secondary-vibrant: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Sarabun', sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 90% -10%, #e0f2fe 0%, #f8fafc 50%, #f0fdf4 100%);
+      min-height: 100vh;
+    }
+
+    .app-shell {
+      width: 100%;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .vibrant-blur {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(110px);
+      opacity: 0.6;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .orb-1 { width: 380px; height: 380px; background: #bae6fd; top: -20px; right: -20px; }
+    .orb-2 { width: 320px; height: 320px; background: #bbf7d0; left: -80px; bottom: 150px; }
+
+    .vibrant-panel {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 10px 30px -10px rgba(2, 132, 199, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .vibrant-card {
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .card-primary:hover {
+      transform: translateY(-4px);
+      border-color: #38bdf8;
+      box-shadow: 0 20px 40px -15px rgba(2, 132, 199, 0.15);
+    }
+
+    .card-secondary:hover {
+      transform: translateY(-4px);
+      border-color: #34d399;
+      box-shadow: 0 20px 40px -15px rgba(16, 185, 129, 0.15);
+    }
+
+    .btn-vibrant {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+    .btn-vibrant::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: all 0.6s ease;
+    }
+    .btn-vibrant:hover::after {
+      left: 100%;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    header { animation: fadeInUp 0.5s ease-out forwards; }
+    .section-1 { animation: fadeInUp 0.5s ease-out 0.1s forwards; opacity: 0; }
+    .section-2 { animation: fadeInUp 0.5s ease-out 0.2s forwards; opacity: 0; }
+    footer { animation: fadeInUp 0.5s ease-out 0.3s forwards; opacity: 0; }
   </style>
-  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
-  <script src="/_sdk/resizing_sdk.js" type="text/javascript"></script>
  </head>
- <body data-template-id="__page-root" class="min-h-screen bg-gray-50">
-  <div class="flex" style="min-height:calc(100 * min(var(--vh,1vh),1vh))">
-   <aside data-template-id="sidebar" class="canva-sidebar sidebar flex flex-col flex-shrink-0">
-    <div class="relative z-10 flex flex-col h-full">
-     <div class="p-5 pb-4">
-      <div class="flex items-center gap-3">
-       <div class="logo-mark">
-        สบต
-       </div>
-       <div>
-        <h1 data-template-id="app-title" class="canva-text text-sm font-bold leading-tight"></h1>
-        <p data-template-id="app-org" class="canva-text text-xs mt-1"></p>
-       </div>
-      </div>
-     </div>
-     <div class="px-5 mb-3">
-      <div class="dg"></div>
-     </div>
-     <nav class="flex-1 px-4 space-y-1" role="navigation" aria-label="เมนูหลัก"><button class="nav-btn active w-full flex items-center gap-3 px-4 py-3 text-sm" data-view="entry" onclick="sw('entry')"><i data-lucide="file-plus" style="width:17px;height:17px"></i><span data-template-id="menu-entry" class="canva-text"></span></button> <button class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-sm" data-view="search" onclick="sw('search')"><i data-lucide="search" style="width:17px;height:17px"></i><span data-template-id="menu-search" class="canva-text"></span></button> <button class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-sm" data-view="report" onclick="sw('report')"><i data-lucide="bar-chart-3" style="width:17px;height:17px"></i><span data-template-id="menu-report" class="canva-text"></span></button>
-     </nav>
-     <div class="p-5 pt-3">
-      <div class="dg mb-3"></div>
-      <p data-template-id="sidebar-footer" class="canva-text text-xs text-center"></p>
-     </div>
-    </div>
-   </aside>
-   <main class="flex-1 overflow-y-auto" style="background:#f4f7f5"><!-- ENTRY -->
-    <section id="view-entry" class="fade">
-     <div class="vhdr sticky top-0 z-10 px-8 py-4">
-      <div class="flex items-center gap-3">
-       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-green-100 to-emerald-50 flex items-center justify-center">
-        <i data-lucide="file-plus" style="width:17px;height:17px" class="text-green-700"></i>
-       </div>
-       <div>
-        <h2 data-template-id="entry-title" class="canva-text font-bold"></h2>
-        <p data-template-id="entry-subtitle" class="canva-text mt-0.5"></p>
-       </div>
-      </div>
-     </div>
-     <div class="p-8 max-w-4xl">
-      <form id="complaint-form" class="card p-7 space-y-4" onsubmit="doSubmit(event)">
-       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-         <label data-template-id="label-seq" class="canva-text block text-sm font-medium mb-1.5"></label><input id="seqNumber" type="number" class="fi w-full px-4 py-2.5 text-sm bg-gray-50/80 cursor-default border-gray-100" readonly placeholder="สร้างอัตโนมัติ">
+ <body>
+  <div class="app-shell py-8 sm:py-12">
+    <div class="vibrant-blur orb-1"></div>
+    <div class="vibrant-blur orb-2"></div>
+    
+    <main class="relative z-10 w-full px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-5xl">
+       
+       <!-- ส่วนหัว (Header) -->
+       <header class="mb-8 sm:mb-10">
+        <div class="vibrant-panel rounded-[28px] p-6 sm:p-10 border-t border-white shadow-xl">
+         <div class="flex flex-col gap-5">
+          <div class="flex items-center gap-3">
+           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white shadow-md shadow-sky-200">
+            <i data-lucide="building-2" style="width: 20px; height: 20px;"></i>
+           </div>
+           <span data-template-id="eyebrow" class="text-xs font-bold tracking-[0.12em] uppercase text-sky-700">สำนักบริหารแรงงานต่างด้าว กรมการจัดหางาน</span>
+          </div>
+          
+          <div class="max-w-4xl">
+           <h1 data-template-id="page-title" class="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 leading-tight">
+            ระบบจัดการและแจ้งกรณีไม่พบข้อมูลในระบบ EWORKPERMIT
+           </h1>
+           
+           <!-- ปรับปรุงเป็นข้อความสีแดง หนา ชัดเจน พร้อมกล่องแจ้งเตือนภัยแบบพรีเมียม -->
+           <div class="mt-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50/90 p-4 sm:p-5 shadow-sm">
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+             <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
+            </div>
+            <p data-template-id="page-subtitle" class="text-sm sm:text-base font-semibold leading-relaxed text-red-600">
+             เว็บไซต์นี้ สำนักบริหารแรงงานต่างด้าว กรมการจัดหางาน ได้จัดทำขึ้นเพื่อตรวจสอบและนำเข้าข้อมูลแรงงานต่างด้าว 4 สัญชาติ กรณีที่ไม่พบข้อมูลในระบบ <span class="underline font-bold decoration-2">eworkpermit.doe.go.th</span>
+            </p>
+           </div>
+          </div>
+          
+          <div class="h-px bg-gradient-to-r from-sky-200 via-slate-200 to-transparent mt-2"></div>
+          
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-500">
+           <div class="flex items-center gap-2 bg-sky-50 text-sky-700 px-3 py-1.5 rounded-lg border border-sky-100">
+            <i data-lucide="globe-2" class="text-sky-600" style="width: 14px; height: 14px;"></i> 
+            <span data-template-id="meta-one">บริการออนไลน์ ตลอด 24 ชั่วโมง</span>
+           </div>
+           <div class="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100">
+            <i data-lucide="mouse-pointer-click" class="text-emerald-600" style="width: 14px; height: 14px;"></i> 
+            <span data-template-id="meta-two">เลือกบริการด้านล่างเพื่อเริ่มขั้นตอน</span>
+           </div>
+          </div>
+         </div>
         </div>
-        <div>
-         <label data-template-id="label-date" class="canva-text block text-sm font-medium mb-1.5" for="receiveDate"></label><input id="receiveDate" type="date" required class="fi w-full px-4 py-2.5 text-sm">
-        </div>
+       </header>
+
+       <!-- ส่วนเนื้อหาบริการหลัก (Primary Services) -->
+       <div class="space-y-8">
+        <section data-template-id="primary-group" class="section-1 rounded-[24px] border border-slate-200/60 bg-white/50 p-5 sm:p-8 shadow-sm">
+         <div class="mb-6 flex flex-col gap-1 px-1">
+          <div class="flex items-center gap-2">
+           <span class="h-3 w-3 rounded-full bg-sky-500 shadow-sm shadow-sky-300"></span>
+           <h2 data-template-id="primary-group-title" class="text-base sm:text-lg font-bold text-slate-800 tracking-tight">บริการหลักสำหรับแจ้งข้อมูล</h2>
+          </div>
+          <p data-template-id="primary-group-desc" class="pl-5 text-xs sm:text-sm text-slate-500">กรุณาเลือกทำรายการส่งข้อมูลใหม่ หรือตรวจสอบสถานะคำขอที่เคยแจ้งไว้</p>
+         </div>
+         
+         <div class="grid gap-6 md:grid-cols-2">
+          <!-- การ์ด 1: แจ้งข้อมูล (Vibrant Blue Theme) -->
+          <article data-template-id="service-card-one" class="vibrant-card card-primary rounded-2xl p-5 sm:p-6 shadow-sm border-b-4 border-b-sky-500">
+           <div class="flex h-full flex-col justify-between gap-6">
+            <div>
+             <div class="mb-5 flex items-start justify-between gap-4">
+              <div data-template-id="service-one-icon-bg" class="h-12 w-12 rounded-xl flex items-center justify-center bg-sky-50 border border-sky-100 text-sky-600 shadow-sm">
+               <i data-lucide="user-plus" style="width: 22px; height: 22px;"></i>
+              </div>
+              <span data-template-id="service-one-number" class="rounded-full bg-sky-100 text-sky-700 px-3 py-1 text-[10px] font-bold tracking-wider uppercase">STEP 01</span>
+             </div>
+             <h3 data-template-id="service-one-title" class="text-lg font-bold text-slate-900 tracking-tight">เพิ่มรายชื่อกรณีไม่พบข้อมูล</h3>
+             <p data-template-id="service-one-desc" class="mt-3 text-xs sm:text-sm leading-relaxed text-slate-600">
+              กรอกฟอร์มเพื่อส่งเรื่องแจ้งข้อมูลแรงงาน/บุคคลที่ไม่พบในระบบ เพื่อให้เจ้าหน้าที่ตรวจสอบความถูกต้องและนำเข้าข้อมูลเข้าสู่ระบบต่อไป
+             </p>
+            </div>
+            <div class="pt-2">
+             <a href="https://108links.com/ework" target="_blank" rel="noopener noreferrer" data-template-id="service-one-button" class="btn-vibrant inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white px-4 py-3.5 text-xs font-bold shadow-lg shadow-sky-100"> 
+              <span>เริ่มแจ้งข้อมูลในระบบ</span> <i data-lucide="arrow-up-right" style="width: 15px; height: 15px;"></i> 
+             </a>
+            </div>
+           </div>
+          </article>
+
+          <!-- การ์ด 2: ตรวจสอบสถานะ (Vibrant Green Theme) -->
+          <article data-template-id="service-card-two" class="vibrant-card card-secondary rounded-2xl p-5 sm:p-6 shadow-sm border-b-4 border-b-emerald-500">
+           <div class="flex h-full flex-col justify-between gap-6">
+            <div>
+             <div class="mb-5 flex items-start justify-between gap-4">
+              <div data-template-id="service-two-icon-bg" class="h-12 w-12 rounded-xl flex items-center justify-center bg-emerald-50 border border-emerald-100 text-emerald-600 shadow-sm">
+               <i data-lucide="clipboard-check" style="width: 22px; height: 22px;"></i>
+              </div>
+              <span data-template-id="service-two-number" class="rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-[10px] font-bold tracking-wider uppercase">STEP 02</span>
+             </div>
+             <h3 data-template-id="service-two-title" class="text-lg font-bold text-slate-900 tracking-tight">ตรวจสอบสถานะ ALINE</h3>
+             <p data-template-id="service-two-desc" class="mt-3 text-xs sm:text-sm leading-relaxed text-slate-600">
+              ติดตามความคืบหน้าของข้อมูลที่คุณได้ยื่นเรื่องแจ้งไปแล้ว ว่าอยู่ในขั้นตอนการตรวจสอบ อนุมัติ หรือนำเข้าระบบเรียบร้อยแล้วหรือไม่
+             </p>
+            </div>
+            <div class="pt-2">
+             <a href="https://jeabnakub.github.io/STATUS-ALINE/" target="_blank" rel="noopener noreferrer" data-template-id="service-two-button" class="btn-vibrant inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3.5 text-xs font-bold shadow-lg shadow-emerald-100"> 
+              <span>ตรวจสอบสถานะปัจจุบัน</span> <i data-lucide="arrow-up-right" style="width: 15px; height: 15px;"></i> 
+             </a>
+            </div>
+           </div>
+          </article>
+         </div>
+        </section>
+
+        <!-- ส่วนเนื้อหาบริการเพิ่มเติม (Secondary Services) -->
+        <section data-template-id="secondary-group" class="section-2 rounded-[24px] border border-slate-200/60 bg-white/50 p-5 sm:p-8 shadow-sm">
+         <div class="mb-5 flex flex-col gap-1 px-1">
+          <div class="flex items-center gap-2">
+           <span class="h-3 w-3 rounded-full bg-slate-400"></span>
+           <h2 data-template-id="secondary-group-title" class="text-base font-bold text-slate-800 tracking-tight">บริการเพิ่มเติม</h2>
+          </div>
+          <p data-template-id="secondary-group-desc" class="pl-5 text-xs text-slate-500">เครื่องมือและคู่มือแนะนำการใช้งานเพิ่มเติม</p>
+         </div>
+         
+         <article data-template-id="service-card-three" class="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 shadow-inner">
+          <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+           <div class="flex items-start gap-4">
+            <div data-template-id="service-three-icon-bg" class="h-11 w-11 rounded-xl bg-white border border-slate-200 text-slate-400 flex items-center justify-center shadow-sm mt-0.5">
+             <i data-lucide="book-open" style="width: 20px; height: 20px;"></i>
+            </div>
+            <div class="min-w-0">
+             <div class="mb-1.5 flex flex-wrap items-center gap-2">
+              <span data-template-id="service-three-number" class="rounded bg-slate-200 text-slate-600 px-2 py-0.5 text-[9px] font-bold tracking-wider">INFO</span> 
+              <span data-template-id="service-three-status" class="rounded bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-[9px] font-semibold">เร็วๆ นี้</span>
+             </div>
+             <h3 data-template-id="service-three-title" class="text-base font-bold text-slate-800">ดาวน์โหลดคู่มือการแก้ไขข้อมูล</h3>
+             <p data-template-id="service-three-desc" class="mt-1 text-xs sm:text-sm text-slate-500 leading-relaxed">
+              เอกสารแนะนำวิธีการเตรียมเอกสารและการตรวจสอบความถูกต้องเบื้องต้นก่อนส่งเรื่องเข้าระบบ เพื่อความรวดเร็วในการอนุมัติ
+             </p>
+            </div>
+           </div>
+           <div>
+            <button type="button" data-template-id="service-three-button" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-200 text-slate-400 cursor-not-allowed px-5 py-3 text-xs font-bold lg:w-auto border border-slate-300" disabled> 
+             <span>ยังไม่เปิดใช้บริการ</span> <i data-lucide="clock" style="width: 14px; height: 14px;"></i> 
+            </button>
+           </div>
+          </div>
+         </article>
+        </section>
        </div>
-       <div>
-        <label data-template-id="label-ref" class="canva-text block text-sm font-medium mb-1.5" for="refNumber"></label><input id="refNumber" type="text" required class="fi w-full px-4 py-2.5 text-sm" placeholder="เช่น สบต.001/2568">
-       </div>
-       <div>
-        <label data-template-id="label-subject" class="canva-text block text-sm font-medium mb-1.5" for="subject"></label><input id="subject" type="text" required class="fi w-full px-4 py-2.5 text-sm" placeholder="ระบุเรื่องร้องเรียน">
-       </div>
-       <div>
-        <label data-template-id="label-issue" class="canva-text block text-sm font-medium mb-1.5" for="issueType"></label> <select id="issueType" required class="fi w-full px-4 py-2.5 text-sm"> <option value="">-- เลือกประเด็นปัญหา --</option> <option>ไม่พบข้อมูลแรงงานต่างด้าว</option> <option>ข้อมูลใบอนุญาตทำงานแรงงานต่างด้าวไม่ถูกต้อง</option> <option>ข้อมูลนายจ้าง/สถานประกอบไม่ถูกต้อง</option> <option>ปัญหาเกี่ยวกับการชำระเงิน</option> <option>ปัญหาการคืนสถานะต่าง ๆ</option> </select>
-       </div>
-       <div>
-        <label data-template-id="label-attachment" class="canva-text block text-sm font-medium mb-1.5" for="attachment"></label> <input id="attachment" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="fi w-full px-4 py-2.5 text-sm file:px-3 file:py-1.5 file:mr-3 file:bg-green-600 file:text-white file:border-0 file:rounded-lg file:text-xs file:font-semibold file:cursor-pointer">
-        <p data-template-id="attachment-hint" class="canva-text text-xs mt-1.5"></p>
-       </div>
-       <div>
-        <label data-template-id="label-officer" class="canva-text block text-sm font-medium mb-1.5" for="officer"></label> <select id="officer" required class="fi w-full px-4 py-2.5 text-sm"> <option value="">-- เลือกเจ้าหน้าที่ --</option> <optgroup label="👨 ชาย"><option>นายปโยธร พลกรณ์</option><option>นายพงศกร โพธิเย็น</option><option>นายพงศ์พิพัฒน์ อยู่ทองจุ้ย</option><option>นายสุเมธ ยิ้มพงษ์</option><option>นายชุมพร บุญเหลี่ยม</option><option>นายธณินทร ทัศนา</option></optgroup> <optgroup label="👩 หญิง"><option>นางสาวฐิติวรดา อินทร์ประสิทธิ์</option><option>นางสาวพิมพ์นภัส กลิ่นบัว</option><option>นางสาวมณฑกานต์ แจ่มใจ</option><option>นางสาวกานต์พิชชา พิมพ์งาม</option><option>นางสาวกุลธิรัตน์ ทีปพรรธน์ธนา</option><option>นางสาวนันทวรรณ บุญเหม</option><option>นางสาวเมขลา อุดมสิริสถาพร</option><option>นางสาวนภาภรณ์ สุขเกษม</option><option>นางสาวพัชราภา สุทธิอาจ</option><option>นางสาวภาณุมาศ สาลีนาค</option><option>นางสาวศิริปรมินทร์ ขันติคเชนชาติ</option><option>นางสุมาลี รักไทย</option><option>นางสาวกนกพร ภูชะหาร</option><option>นางสาวธมกร พิมพ์งาม</option><option>นางสาวนุศรา กลิ่นจุน</option><option>นางสาวพรพัสตร์ ช่วยบำรุง</option></optgroup> </select>
-       </div>
-       <div>
-        <label data-template-id="label-status" class="canva-text block text-sm font-medium mb-1.5" for="status"></label> <select id="status" required class="fi w-full px-4 py-2.5 text-sm"> <option value="">-- เลือกสถานะ --</option> <option>อยู่ระหว่างการตรวจสอบข้อมูล</option> <option>ดำเนินการเรียบร้อยพบข้อมูลใน ework ถูกต้อง</option> <option>ดำเนินการเสร็จสิ้น</option> </select>
-       </div>
-       <div>
-        <label data-template-id="label-note" class="canva-text block text-sm font-medium mb-1.5" for="note"></label><textarea id="note" rows="2" class="fi w-full px-4 py-2.5 text-sm resize-none" placeholder="ระบุหมายเหตุ (ถ้ามี)"></textarea>
-       </div>
-       <div>
-        <label data-template-id="label-datetime" class="canva-text block text-sm font-medium mb-1.5"></label><input id="thaiDatetime" type="text" readonly class="fi w-full px-4 py-2.5 text-sm bg-gray-50/80 cursor-default border-gray-100">
-       </div>
-       <div class="flex gap-3 pt-2"><button data-template-id="btn-save" type="submit" class="canva-button bp px-7 py-2.5 text-sm"></button> <button data-template-id="btn-clear" type="button" class="canva-button bs px-7 py-2.5 text-sm" onclick="clrForm()"></button>
-       </div>
-      </form>
-     </div>
-    </section><!-- SEARCH -->
-    <section id="view-search" class="fade hidden">
-     <div class="vhdr sticky top-0 z-10 px-8 py-4">
-      <div class="flex items-center gap-3">
-       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-green-100 to-emerald-50 flex items-center justify-center">
-        <i data-lucide="search" style="width:17px;height:17px" class="text-green-700"></i>
-       </div>
-       <div>
-        <h2 data-template-id="search-title" class="canva-text font-bold"></h2>
-        <p data-template-id="search-subtitle" class="canva-text mt-0.5"></p>
-       </div>
+
+       <!-- ส่วนท้าย (Footer) -->
+       <footer class="pt-8 text-center border-t border-slate-200/50 mt-8">
+        <p data-template-id="footer-note" class="text-xs text-slate-400 font-medium">
+          © 2026 E-WORKPERMIT Helpdesk System | สำนักบริหารแรงงานต่างด้าว กรมการจัดหางาน. สงวนลิขสิทธิ์ตามกฎหมาย.
+        </p>
+       </footer>
+       
       </div>
-     </div>
-     <div class="p-8 max-w-4xl">
-      <div class="card p-4 flex gap-3 mb-6">
-       <div class="relative flex-1">
-        <i data-lucide="search" style="width:15px;height:15px" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i><input id="searchRef" type="text" class="fi w-full pl-10 pr-4 py-2.5 text-sm" placeholder="กรอกเลขรับสบต.">
-       </div><button data-template-id="btn-search" class="canva-button bp px-6 py-2.5 text-sm" onclick="doSearch()"></button> <button data-template-id="btn-search-clear" class="canva-button bs px-6 py-2.5 text-sm" onclick="clrSearch()"></button>
-      </div>
-      <div id="search-result"></div>
-     </div>
-    </section><!-- REPORT -->
-    <section id="view-report" class="fade hidden">
-     <div class="vhdr sticky top-0 z-10 px-8 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-green-100 to-emerald-50 flex items-center justify-center">
-        <i data-lucide="bar-chart-3" style="width:17px;height:17px" class="text-green-700"></i>
-       </div>
-       <div>
-        <h2 data-template-id="report-title" class="canva-text font-bold"></h2>
-        <p data-template-id="report-subtitle" class="canva-text mt-0.5"></p>
-       </div>
-      </div><button data-template-id="btn-load-report" class="canva-button bp px-5 py-2.5 text-sm flex items-center gap-2" onclick="loadReport()"><i data-lucide="refresh-cw" style="width:14px;height:14px"></i></button>
-     </div>
-     <div class="p-8 max-w-5xl">
-      <div id="report-content">
-       <div class="text-center py-16">
-        <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-         <i data-lucide="bar-chart-3" style="width:28px;height:28px" class="text-gray-300"></i>
-        </div>
-        <p class="text-sm font-semibold text-gray-400">กดปุ่มโหลดรายงานเพื่อดูข้อมูลสรุป</p>
-       </div>
-      </div>
-     </div>
-    </section>
-   </main>
+    </main>
   </div>
-  <div id="modal-root"></div>
-  <script src="/_sdk/editing_sdk.js"></script>
+
   <script>
-    const GAS='https://script.google.com/macros/s/AKfycbz0ELgxLjJwirDkIV6l-B7b1_MEU4026XGuwOhneNG9sTEI4YP5D7CECj_HkYdqm3eSDw/exec';
-    lucide.createIcons();
-
-    // Modal
-    function modal(t,title,text,confirm=true){
-      const icons={s:'check',e:'x',w:'alert-triangle'};
-      const ic=icons[t]?`<i data-lucide="${icons[t]}" style="width:24px;height:24px"></i>`:'<svg class="spin" style="width:24px;height:24px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>';
-      const cls={s:'s',e:'e',w:'w',l:'l'}[t]||'l';
-      document.getElementById('modal-root').innerHTML=`<div class="mo" onclick="${confirm?'clsModal()':''}"><div class="mo-box" onclick="event.stopPropagation()"><div class="mo-ic ${cls}">${ic}</div><h3 class="text-lg font-bold text-gray-900 mb-2">${title}</h3>${text?`<p class="text-sm text-gray-500 mb-5 leading-relaxed">${text}</p>`:''}${confirm?'<button onclick="clsModal()" class="bp px-7 py-2 text-sm">ตกลง</button>':''}</div></div>`;
-      lucide.createIcons();
-    }
-    function clsModal(){document.getElementById('modal-root').innerHTML=''}
-
-    // Thai datetime
-    function thaiDT(){const n=new Date(),m=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];return`${n.getDate()} ${m[n.getMonth()]} ${n.getFullYear()+543} เวลา ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')} น.`}
-    function updDT(){const e=document.getElementById('thaiDatetime');if(e)e.value=thaiDT()}
-    setInterval(updDT,1000);updDT();
-
-    function genSeq(){const e=document.getElementById('seqNumber');if(e){const y=new Date().getFullYear()+543;e.value=`สบต.${String((Date.now()%999)+1).padStart(3,'0')}/${y}`}}
-    window.addEventListener('DOMContentLoaded',genSeq);
-
-    // Navigation
-    function sw(v){
-      document.querySelectorAll('[id^="view-"]').forEach(s=>s.classList.add('hidden'));
-      const t=document.getElementById('view-'+v);t.classList.remove('hidden','fade');void t.offsetWidth;t.classList.add('fade');
-      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelector(`[data-view="${v}"]`).classList.add('active');
-      if(v==='entry'){updDT();genSeq()}
-    }
-
-    // JSONP
-    let jc=0;
-    function jp(p){return new Promise((ok,no)=>{const cb='_jp'+(++jc)+'_'+Date.now();const to=setTimeout(()=>{rm();no(new Error('timeout'))},30000);function rm(){clearTimeout(to);delete window[cb];const s=document.getElementById(cb);if(s)s.remove()}window[cb]=d=>{rm();ok(d)};p.append('callback',cb);const s=document.createElement('script');s.id=cb;s.src=GAS+'?'+p;s.onerror=()=>{rm();no(new Error('err'))};document.body.appendChild(s)})}
-
-    // Submit
-    async function doSubmit(e){
-      e.preventDefault();
-      modal('l','กำลังบันทึกข้อมูล...','กรุณารอสักครู่',false);
-      const fi=document.getElementById('attachment');let b64='',fn='';
-      if(fi.files.length>0){const f=fi.files[0];fn=f.name;b64=await new Promise(r=>{const rd=new FileReader();rd.onload=ev=>r(ev.target.result);rd.readAsDataURL(f)})}
-      const fd=new URLSearchParams();
-      ['action','refNumber','receiveDate','subject','issueType','officer','status','note'].forEach(k=>{fd.append(k,k==='action'?'create':document.getElementById(k==='action'?'':k)?.value||'')});
-      fd.set('action','create');fd.append('thaiDatetime',thaiDT());fd.append('file',b64);fd.append('fileName',fn);
-      try{const r=await(await fetch(GAS,{method:'POST',body:fd.toString(),headers:{"Content-Type":"application/x-www-form-urlencoded"}})).json();
-        r.status==='success'?modal('s','สำเร็จ!','บันทึกข้อมูลและไฟล์เรียบร้อยแล้ว'):modal('e','เกิดข้อผิดพลาด',r.message||'ไม่สามารถบันทึกได้');
-        if(r.status==='success')clrForm();
-      }catch{modal('e','เกิดข้อผิดพลาด','ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้')}
-    }
-
-    function clrForm(){document.getElementById('complaint-form').reset();updDT();genSeq()}
-    function clrSearch(){document.getElementById('searchRef').value='';document.getElementById('search-result').innerHTML=''}
-
-    // Search
-    async function doSearch(){
-      const ref=document.getElementById('searchRef').value.trim();
-      if(!ref){modal('w','กรุณากรอกเลขรับสบต.');return}
-      modal('l','กำลังค้นหา...',null,false);
-      const p=new URLSearchParams();p.append('action','search');p.append('refNumber',ref);
-      try{
-        const r=await jp(p);clsModal();const c=document.getElementById('search-result');
-        if(r.status==='success'&&r.data){const d=r.data;
-          const sc=d.status==='ดำเนินการเสร็จสิ้น'?'bg-emerald-50 text-emerald-700 border-emerald-200':d.status?.includes('ework')?'bg-teal-50 text-teal-700 border-teal-200':'bg-amber-50 text-amber-700 border-amber-200';
-          c.innerHTML=`<div class="fade card overflow-hidden"><div class="rh px-6 py-5"><div class="relative z-10 flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center"><i data-lucide="file-text" style="width:16px;height:16px" class="text-white"></i></div><div><h3 class="text-white font-bold">รายละเอียดเรื่องร้องเรียน</h3><p class="text-green-200 text-xs mt-0.5">${d.refNumber||'-'}</p></div></div></div><div class="p-6 space-y-3"><div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">${[['ลำดับที่',d.rowIndex],['เลขรับสบต.',d.refNumber],['วันที่รับ',d.receiveDate],['เรื่อง',d.subject],['ประเด็นปัญหา',d.issueType],['เจ้าหน้าที่',d.officer]].map(([l,v])=>`<div class="ic"><p class="text-xs text-gray-400 mb-0.5 font-semibold">${l}</p><p class="text-sm font-bold text-gray-800">${v||'-'}</p></div>`).join('')}</div><div class="pt-1"><p class="text-xs text-gray-400 mb-1.5 font-semibold">สถานะ</p><span class="inline-block px-4 py-1.5 rounded-full text-sm font-semibold border ${sc}">${d.status||'-'}</span></div>${d.note?`<div><p class="text-xs text-gray-400 mb-1 font-semibold">หมายเหตุ</p><p class="text-sm text-gray-700">${d.note}</p></div>`:''}${d.thaiDatetime?`<div><p class="text-xs text-gray-400 mb-1 font-semibold">วันเวลาแจ้งสถานะ</p><p class="text-sm text-gray-700">${d.thaiDatetime}</p></div>`:''}</div></div>`;
-          lucide.createIcons();
-        }else{c.innerHTML=`<div class="fade text-center py-16"><div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><i data-lucide="search-x" style="width:24px;height:24px" class="text-gray-300"></i></div><p class="text-sm font-semibold text-gray-400">ไม่พบเลขรับสบต. "${ref}"</p></div>`;lucide.createIcons()}
-      }catch{modal('e','เกิดข้อผิดพลาด','ไม่สามารถค้นหาได้')}
-    }
-
-    // Report
-    async function loadReport(){
-      modal('l','กำลังโหลดรายงาน...',null,false);
-      const p=new URLSearchParams();p.append('action','report');
-      try{
-        const r=await jp(p);clsModal();const c=document.getElementById('report-content');
-        if(r?.status==='success'&&r.data){const d=r.data;
-          const iCols=[{bg:'#fef2f2',bd:'#fecaca',ic:'#dc2626',n:'#b91c1c'},{bg:'#fff7ed',bd:'#fed7aa',ic:'#ea580c',n:'#c2410c'},{bg:'#fffbeb',bd:'#fde68a',ic:'#d97706',n:'#b45309'},{bg:'#eff6ff',bd:'#bfdbfe',ic:'#2563eb',n:'#1d4ed8'},{bg:'#faf5ff',bd:'#e9d5ff',ic:'#9333ea',n:'#7e22ce'}];
-          const iIc=['alert-circle','file-warning','building-2','credit-card','rotate-ccw'];
-          const sCols=[{bg:'#fffbeb',bd:'#fde68a',ic:'#d97706',lb:'#b45309'},{bg:'#f0fdfa',bd:'#99f6e4',ic:'#0d9488',lb:'#0f766e'},{bg:'#ecfdf5',bd:'#a7f3d0',ic:'#059669',lb:'#047857'}];
-          const sIc=['clock','check-circle','check-circle-2'];
-          let h=`<div class="fade space-y-7"><div class="sh p-8 text-white shadow-xl"><div class="relative z-10"><div class="flex items-center gap-3 mb-3"><div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center"><i data-lucide="file-text" style="width:22px;height:22px"></i></div><p class="text-green-200 text-sm font-semibold uppercase tracking-wide">จำนวนเรื่องร้องเรียนทั้งหมด</p></div><p class="text-6xl font-black">${d.total||0}</p><p class="text-green-300 mt-1 font-medium">รายการ</p></div></div>`;
-          // Issues
-          h+=`<div><div class="flex items-center gap-2 mb-4"><div class="w-1 h-6 bg-gradient-to-b from-green-600 to-green-400 rounded-full"></div><h3 class="font-bold text-gray-800">สรุปตามประเด็นปัญหา</h3></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`;
-          if(d.byIssue&&Object.keys(d.byIssue).length){Object.entries(d.byIssue).forEach(([k,v],i)=>{const c=iCols[i%5];h+=`<div class="icard p-4 flex items-center gap-3" style="background:${c.bg};border-color:${c.bd}"><div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:${c.bg};border:1px solid ${c.bd}"><i data-lucide="${iIc[i%5]}" style="width:18px;height:18px;color:${c.ic}"></i></div><div class="min-w-0"><p class="text-xs text-gray-600 font-semibold truncate">${k}</p><p class="text-2xl font-black mt-0.5" style="color:${c.n}">${v}</p></div></div>`})}else{h+=`<p class="text-sm text-gray-400 col-span-2 text-center py-8">ไม่มีข้อมูล</p>`}
-          h+=`</div></div>`;
-          // Status
-          h+=`<div><div class="flex items-center gap-2 mb-4"><div class="w-1 h-6 bg-gradient-to-b from-green-600 to-green-400 rounded-full"></div><h3 class="font-bold text-gray-800">สรุปตามสถานะ</h3></div><div class="grid grid-cols-1 sm:grid-cols-3 gap-3">`;
-          if(d.byStatus&&Object.keys(d.byStatus).length){Object.entries(d.byStatus).forEach(([k,v],i)=>{const c=sCols[i%3];h+=`<div class="scard p-6" style="background:${c.bg};border-color:${c.bd}"><div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style="background:${c.bg};border:1.5px solid ${c.bd}"><i data-lucide="${sIc[i%3]}" style="width:20px;height:20px;color:${c.ic}"></i></div><p class="text-3xl font-black" style="color:${c.lb}">${v}</p><p class="text-xs text-gray-600 mt-2 font-semibold">${k}</p></div>`})}else{h+=`<p class="text-sm text-gray-400 col-span-3 text-center py-8">ไม่มีข้อมูล</p>`}
-          h+=`</div></div></div>`;
-          c.innerHTML=h;lucide.createIcons();
-        }else{c.innerHTML=`<div class="text-center py-16"><div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><i data-lucide="alert-circle" style="width:28px;height:28px" class="text-gray-400"></i></div><p class="font-semibold text-gray-700">ไม่สามารถโหลดรายงาน</p></div>`;lucide.createIcons()}
-      }catch{modal('e','เกิดข้อผิดพลาด','ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้')}
-    }
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    });
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9fa1965a75d045ad',t:'MTc3ODUwNjc0MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ </body>
 </html>
