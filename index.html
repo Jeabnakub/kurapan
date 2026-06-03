@@ -6,7 +6,8 @@
   <title>ระบบแจ้งกรณีไม่พบข้อมูลในระบบ EWORKPERMIT</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Niramit:wght@300;400;500;600;700&amp;family=Noto+Sans+Thai:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <!-- นำเข้าฟอนต์ IBM Plex Sans Thai และ Anuphan เพื่อความคมชัดระดับสูงสุด -->
+  <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
   <style>
     :root {
       --ink: #0f172a;
@@ -20,7 +21,8 @@
 
     body {
       margin: 0;
-      font-family: 'Niramit', 'Noto Sans Thai', sans-serif;
+      /* เลือกใช้ IBM Plex Sans Thai เป็นหลักเพื่อให้ระบบดูสวยงาม มีระเบียบ คมชัดอ่านง่าย */
+      font-family: 'IBM Plex Sans Thai', 'Anuphan', sans-serif;
       color: var(--ink);
       background: radial-gradient(circle at 90% -10%, #e0f2fe 0%, #f8fafc 50%, #f0fdf4 100%);
       min-height: 100vh;
@@ -113,7 +115,6 @@
            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white shadow-md shadow-sky-200">
             <i data-lucide="building-2" style="width: 20px; height: 20px;"></i>
            </div>
-           <!-- ปรับหัวข้อหน่วยงานให้เป็นทางการ -->
            <span data-template-id="eyebrow" class="text-xs font-bold tracking-[0.12em] uppercase text-sky-700">สำนักบริหารแรงงานต่างด้าว กรมการจัดหางาน</span>
           </div>
           
@@ -122,7 +123,7 @@
             ระบบจัดการและแจ้งกรณีไม่พบข้อมูลในระบบ EWORKPERMIT
            </h1>
            
-           <!-- ปรับปรุงกล่องข้อความแจ้งเตือนสีแดงตามที่ระบุ หนา ชัดเจน สะดุดตา -->
+           <!-- กล่องข้อความแจ้งเตือนสีแดงเข้ม หนา ชัดเจน สะดุดตา -->
            <div class="mt-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50/90 p-4 sm:p-5 shadow-sm">
             <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
              <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
